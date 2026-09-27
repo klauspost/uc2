@@ -1,0 +1,6 @@
+*.go text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.uc2 binary
+*.UC2 binary
+*.dat binary

@@ -1,0 +1,11 @@
+/testdata/samples/
+/testdata/fuzz/*/corpus-cache/
+*.test
+*.prof
+/cmd/uc2/uc2
+/cmd/uc2/uc2.exe
+/.idea/
+/uc2
+/uc2.exe
+/dist/
+/_reference/
