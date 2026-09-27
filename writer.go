@@ -30,6 +30,9 @@ const (
 	maxDirEntries = 1 << 22
 )
 
+// now is the clock for entries without a time: Create and the comment.
+var now = time.Now
+
 var (
 	errClosed  = errors.New("uc2: writer is closed")
 	errDirFull = errors.New("uc2: too many entries in one directory")
@@ -175,7 +178,7 @@ func (w *Writer) fail(err error) error {
 
 // Create adds a file with the current time and the archive attribute.
 func (w *Writer) Create(name string) (io.Writer, error) {
-	return w.CreateHeader(&FileHeader{Name: name, Modified: time.Now(), Attr: AttrArchive})
+	return w.CreateHeader(&FileHeader{Name: name, Modified: now(), Attr: AttrArchive})
 }
 
 // CreateHeader adds a file or directory (Name ending in "/"). Adding an existing
@@ -746,7 +749,7 @@ func (w *Writer) addComment() {
 	w.dropComment()
 	b, _ := encodeOEM(*w.comment, w.cfg.charset)
 	name, _ := format.MakeName([]byte("U$~COMM"), []byte("TXT"))
-	date, tm := format.DOSTime(time.Now())
+	date, tm := format.DOSTime(now())
 	rev := &wrev{meta: format.Meta{Attr: uint8(AttrArchive), Date: date, Time: tm}}
 	w.root.groups = append(w.root.groups, &wgroup{name: name, revs: []*wrev{rev}})
 	w.root.byAlias[name] = w.root.groups[len(w.root.groups)-1]
