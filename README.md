@@ -12,11 +12,14 @@ Ported by Claude Code Opus 5.5.
   the [documented extensions](#extensions).
 * API modelled on `archive/zip`, plus `io/fs` support.
 * Parallel compression with deterministic output, streaming decompression, bounded memory.
-* `cmd/uc2`: a command line tool with the original's syntax.
+* `cmd/uc2`: a command line tool with the original's syntax and look.
+
+![The uc2 help menu](docs/help.png)
 
 ```
 go get github.com/klauspost/uc2
 ```
+
 This is created as a celebration of UC2, 
 which was one of the programs that peaked my interest in compression.
 Consider this a toy project for fun and research only.
@@ -26,6 +29,7 @@ and additional modern safety measures have been implemented,
 it is not a production-quality library. 
 
 Use at your own risk.
+
 
 ## Usage
 
@@ -254,6 +258,11 @@ Readers prefer `UC2X:UTF8Name`, then `AIP:Win95 LongN`, then the 8.3 name.
 * Damage protection keeps 2 bytes per 512-byte sector in memory while writing.
 
 ## Command line
+
+![Adding files with uc2 A](docs/add.png)
+
+![A verbose listing with uc2 V](docs/list.png)
+
 
 `cmd/uc2` implements the original commands with the original syntax. Install it with
 `go install github.com/klauspost/uc2/cmd/uc2@latest`, or download a binary for Linux, Windows,
