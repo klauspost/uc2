@@ -1,0 +1,38 @@
+LIST [\]
+   DIR
+      NAME=[ALPHA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[BETA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[EMPTY]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[GAMMA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+LIST [\ALPHA\]
+LIST [\BETA\]
+   DIR
+      NAME=[INNER]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+LIST [\BETA\INNER\]
+LIST [\EMPTY\]
+LIST [\GAMMA\]
+END
+SPEC-SECTION
+    DAMPRO = 0
+    VOLLABEL = "TILDELBL   "
+    SERIAL = 0
+    UC2-REVISION = 2
+END

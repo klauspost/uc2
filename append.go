@@ -2,10 +2,13 @@ package uc2
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/klauspost/uc2/internal/dp"
@@ -25,6 +28,7 @@ type appendState struct {
 	r      *Reader
 	size   int64
 	unlock func()
+	nodes  map[*File]any // the *wdir or *wrev loaded from each entry of r
 }
 
 // NewAppendWriter opens the archive in f (which must be opened for reading and
@@ -64,7 +68,7 @@ func newAppendWriter(f appendFile, size int64, opts []Option) (*Writer, error) {
 		return nil, err
 	}
 	w := NewWriter(f, opts...)
-	w.app = &appendState{f: f, r: r, size: size}
+	w.app = &appendState{f: f, r: r, size: size, nodes: map[*File]any{}}
 	if w.cfg.protect == nil {
 		w.cfg.protect = &r.Protected
 	}
@@ -99,6 +103,7 @@ func (w *Writer) load(r *Reader) error {
 		long := path.Base(strings.TrimSuffix(f.Name, "/"))
 		if e.Type == format.BoDir {
 			d := &wdir{parent: parent, name: e.Meta.Name, tags: e.Tags, meta: e.Meta, byLong: map[string]any{}, byAlias: map[format.Name]any{}}
+			w.app.nodes[f] = d
 			d.path83 = len(d.name.Bytes())
 			if parent != w.root {
 				d.path83 += parent.path83 + 1
@@ -134,9 +139,47 @@ func (w *Writer) load(r *Reader) error {
 				tags = append(tags, t)
 			}
 		}
-		g.revs = append(g.revs, &wrev{meta: e.Meta, tags: tags, size: f.Size, fletch: e.Fletch,
-			method: e.Comp.Method, master: m, off: f.offset, comp: f.CompressedSize})
+		rev := &wrev{meta: e.Meta, tags: tags, size: f.Size, fletch: e.Fletch,
+			method: e.Comp.Method, master: m, off: f.offset, comp: f.CompressedSize}
+		g.revs = append(g.revs, rev)
+		w.app.nodes[f] = rev
 	}
+	return nil
+}
+
+// replaceTags implements tags.Replace.
+func (w *Writer) replaceTags(f *File, t []format.Tag) error {
+	if w.app == nil || w.closed {
+		return errors.New("uc2: not an open append writer")
+	}
+	var cur *[]format.Tag
+	switch n := w.app.nodes[f].(type) {
+	case *wrev:
+		cur = &n.tags
+	case *wdir:
+		cur = &n.tags
+	default:
+		return errors.New("uc2: entry is not in the archive")
+	}
+	isName := func(x format.Tag) bool { return x.Name == tagLongName || x.Name == tagUTF8Name }
+	isSize := func(x format.Tag) bool { return x.Name == tagSize64 }
+	nt := slices.DeleteFunc(slices.Clone(*cur), func(x format.Tag) bool { return !isName(x) })
+	for _, x := range t {
+		switch {
+		case x.Name == "" || len(x.Name) > format.TagNameMax || strings.IndexByte(x.Name, 0) >= 0 || len(x.Data) > format.MaxTagSize:
+			return fmt.Errorf("uc2: invalid tag %q", x.Name)
+		case !isName(x) && !isSize(x):
+			nt = append(nt, format.Tag{Name: x.Name, Data: bytes.Clone(x.Data)})
+		}
+	}
+	eq := func(a, b format.Tag) bool { return a.Name == b.Name && bytes.Equal(a.Data, b.Data) }
+	noSize := func(l []format.Tag) []format.Tag { return slices.DeleteFunc(slices.Clone(l), isSize) }
+	// The first test keeps entries whose name tags follow other tags as they
+	// are when the tags come back unchanged.
+	if slices.EqualFunc(noSize(t), noSize(*cur), eq) || slices.EqualFunc(nt, *cur, eq) {
+		return nil
+	}
+	*cur, w.changed = nt, true
 	return nil
 }
 

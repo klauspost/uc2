@@ -86,9 +86,9 @@ func (l *lister) dir(d string, masks []*mask, top bool, via *mask) {
 	switch {
 	case l.verbose:
 		if !top {
-			a.outf("%s\n", strings.Repeat("-", 76))
+			a.outf(cH+"%s\n", strings.Repeat("-", 76))
 		}
-		a.outf("--> Directory of %s\n\n", header)
+		a.outf(cH+"--> Directory of %s\n"+cN+"\n", header)
 		for _, s := range subs {
 			base, ext, _ := strings.Cut(s.ShortName, ".")
 			a.outf("%-8s %-3s <DIR>%s\n", base, ext, longName(s))
@@ -98,7 +98,7 @@ func (l *lister) dir(d string, masks []*mask, top bool, via *mask) {
 		}
 		l.summary(sel)
 	case top || len(sel) > 0:
-		a.outf("--> Directory of %s\n", header)
+		a.outf(cH+"--> Directory of %s\n"+cN, header)
 		n := 0
 		item := func(s string) {
 			if n++; n%5 == 0 {
@@ -208,9 +208,9 @@ func (l *lister) trailer(r *uc2.Reader, size int64) {
 	a := l.a
 	rat, hasRatio := ratio(size, total)
 	if !l.verbose {
-		a.outf("files listed = %s (%s bytes)\n", neat(l.count), neat(l.total))
+		a.outf(cH+"files listed = %s (%s bytes)\n", neat(l.count), neat(l.total))
 		if hasRatio {
-			a.outf("compression ratio = %s\n", rat)
+			a.outf(cOK+"compression ratio = %s\n", rat)
 		}
 		return
 	}
@@ -225,13 +225,15 @@ func (l *lister) trailer(r *uc2.Reader, size int64) {
 	if rev == 0 {
 		rev = 1
 	}
-	a.outf("\nArchive is %sdamage protected, %s\n", prot, label)
-	a.outf("Archive created by UltraCompressor II revision %d\n", rev)
-	a.outf("files listed           = %-8s total length listed files = %s bytes\n", neat(l.count), neat(l.total))
-	a.outf("files in archive       = %-8s total length all files    = %s bytes\n", neat(files), neat(total))
-	a.outf("directories in archive = %-8s archive length            = %s bytes\n", neat(dirs), neat(size))
+	// The library does not expose the serial number, which UC2 shows
+	// after the two spaces; archives of unregistered copies have none.
+	a.outf("\n"+cH+"Archive is %sdamage protected, %s\n", prot, label)
+	a.outf(cOK+"Archive created by UltraCompressor II revision %d  \n", rev)
+	a.outf(cH+"files listed           = %-8stotal length listed files = %s bytes\n", neat(l.count), neat(l.total))
+	a.outf(cH+"files in archive       = %-8stotal length all files    = %s bytes\n", neat(files), neat(total))
+	a.outf(cH+"directories in archive = %-8sarchive length            = %s bytes\n", neat(dirs), neat(size))
 	if hasRatio {
-		a.outf("compression ratio      = %s\n", rat)
+		a.outf(cOK+"compression ratio      = %s\n", rat)
 	}
 }
 

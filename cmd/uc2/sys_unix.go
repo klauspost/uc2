@@ -28,3 +28,8 @@ func keepOwner(f *os.File, orig fs.FileInfo) error {
 }
 
 func replaceFile(tmp, dst string) error { return os.Rename(tmp, dst) }
+
+func enableVT(*os.File) (func(), bool) { return func() {}, true }
+
+// openConsole opens the terminal for reading key presses.
+func openConsole() (*os.File, error) { return os.OpenFile("/dev/tty", os.O_RDWR, 0) }

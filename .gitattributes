@@ -1,6 +1,8 @@
 *.go text eol=lf
 *.md text eol=lf
+cmd/uc2/manual.txt text eol=lf
 *.yml text eol=lf
 *.uc2 binary
 *.UC2 binary
 *.dat binary
+cmd/uc2/testdata/tilde/** binary

@@ -1,6 +1,6 @@
 # uc2 — UltraCompressor II for Go
 
-A Go implementation of the [UltraCompressor II](https://en.wikipedia.org/wiki/UltraCompressor_II)
+A modern Go implementation of the [UltraCompressor II](https://en.wikipedia.org/wiki/UltraCompressor_II)
 archive format (`.UC2`), the 1992–1996 DOS archiver by Nico de Vries / AIP‑NL.
 
 Ported by Claude Code Opus 5.5.
@@ -17,8 +17,9 @@ Ported by Claude Code Opus 5.5.
 ```
 go get github.com/klauspost/uc2
 ```
-
-Consider this a toy project for fun and research only. 
+This is created as a celebration of UC2, 
+which was one of the programs that peaked my interest in compression.
+Consider this a toy project for fun and research only.
 
 While it has been reviewed and tested against the original UC2 
 and additional modern safety measures have been implemented,
@@ -271,11 +272,20 @@ uc2 p archive                 add damage protection
 Also `m` (move), `f` (freshen), `d` (delete), `u` (unprotect), `o` (optimize) and `r` (comment),
 the option letters `TF TN TT TST S M F I B P U`, `;n`/`;*` revision selection, `!exclude`,
 `#dest`, `##`, `@script` and `&`. GNU-style long flags are accepted as well
-(`uc2 add --recurse --level=tight archive dir`); run `uc2 --help` for details.
+(`uc2 add --recurse --level=tight archive dir`), though not in script files; run `uc2 -?` for a
+summary.
+
+On a terminal of at least 80×20 characters, `uc2` without arguments opens UC2's
+full-screen help menu. It shows chapters 0-8 of the UltraCompressor II 2.4 manual, with the
+license chapter replaced by this port's, in UC2's viewer: `0`-`8` and `A`-`Z` jump to a chapter
+or paragraph, `S` searches all of them, `Tab` prints the chapter's summary and exits, and `Esc`
+goes back. As with UC2, `uc2 -? words` opens the viewer on a search, and `uc2 -? 105` explains
+error 105. Without a terminal, and for `uc2 -?` or `uc2 --help`, the short help is printed instead.
 
 Masks match either the DOS 8.3 name with DOS wildcard rules or the long name with a
 case-insensitive glob. Arguments that start with `@`, `&`, `-`, `#` or `!` are taken as file names
 if such a file exists, so a shell wildcard can't inject commands; still, prefer `uc2 a arch -- *`.
+Likewise, a whole line of a script file that names an existing file is that name.
 Symbolic links that point outside the added tree are skipped, and files that change while being
 added or moved are skipped, not deleted.
 
@@ -285,9 +295,39 @@ existing `.git` directory. Commands that rewrite an archive (`A`, `M`, `D`, `R`,
 damaged archives; repair them with `T` first. Updates keep the archive's permissions, and are
 aborted if another process changes the archive meanwhile.
 
-Prompts only appear on a terminal. Exit codes follow UC2's error levels (0 OK, 20 nothing
-matched, 90 damage found, 145 newer version needed, ...). Not supported: `C` (convert), the `$`
-and `~` commands, `!DTT`, `!CONTAINS`, `!QUERY`, lock files, `!VLAB`, `!RELIA` and banners.
+The output looks like UC2's: its logo, texts and colors, and, on a terminal, revision 2's
+`······` → `■■■■■■` progress bars. Colors are used on terminals only; `--color=never|always`
+overrides that, and `NO_COLOR` or `TERM=dumb` switch them off. `UC2_NO_HIGH_ASCII` draws the logo
+and bars in ASCII, as it did in UC2. Unlike UC2, errors, warnings and the error summary go to
+stderr. Questions appear when stderr is a terminal and, as in UC2, take a single key from the
+console; `+` aborts. Without a terminal, existing files are skipped with a warning.
+
+Exit codes follow UC2's error levels (0 OK, 20 nothing matched, 90 damage found, 145 newer version
+needed, ...). Not supported: `C` (convert), the `$` commands, the configuration menu,
+`!DTT`, `!CONTAINS`, `!QUERY`, lock files, `!VLAB`, `!RELIA` and banners.
+
+UC2's commands for front ends work as well. They show no logo and, instead of "Everything went
+OK", create `U$~RESLT.OK` in the current directory when they succeed (unless `UC2_OK=OFF`) and
+delete it after errors and warnings:
+
+* `uc2 ~D archive [masks]` prints a fixed-format recursive listing, with UC 2.37b's long names
+  and UC2's CRLF line ends.
+* `uc2 ~X archive dumpfile` writes the tags of all entries to a binary dump, and
+  `uc2 ~R archive dumpfile` applies such a dump to the archive in place. Both take the archive
+  name as given. Unlike UC2, `~R` checks the whole dump first and changes nothing if it is
+  invalid, and it applies directory entries too. Long name and size tags are managed by the port
+  and stay as they are, with a warning if the dump changes them.
+* `uc2 ~K path` deletes everything below `path` except names that contain `.U~K`. Symbolic links
+  and junctions are removed, never followed.
+* `uc2 ~V file` shows a text file in the help viewer.
+* `~M` and `~~` are accepted and do nothing.
+
+This makes `uc2` a drop-in replacement for `UC.EXE` in Total Commander (Configuration → Packer):
+listing, extracting, adding and deleting work. Total Commander shows the 8.3 names, as it did
+with UC2. Names in its list files may contain spaces or start with `-`; when adding, they may
+also start with `@`, `&`, `#` or `!`. Total Commander copies the names from `~D` unquoted into
+its scripts, so `~D` shows a leading `@`, `&`, `#` or `!` as the wildcard `?`: a hostile archive
+cannot inject commands, and the file can still be extracted.
 
 ## Testing
 
@@ -346,9 +386,24 @@ No major divergences, but extensions to various functionality...
 
 * File revisions are supported. UC2 can store multiple versions of a file in the same archive, and the reader exposes them all.
 
+## Security
+
+This repo will not accept security reports.
+
+You are however welcome to send pull requests with fixes.
+
 ## License and provenance
 
 UltraCompressor II was written by Nico de Vries (AIP-NL), who released its source code under the
 GNU LGPL v3 in 2015. This package is a new implementation derived from that source, and embeds
 UC2's built-in dictionary (`internal/super/super.dat`, taken verbatim from the release).
 It is therefore licensed under the LGPL v3 (see `LICENSE` and `COPYING`).
+
+The help menu of `cmd/uc2` embeds chapters 0-8 of the UltraCompressor II 2.4 manual
+(`cmd/uc2/manual.txt`), with its license chapter replaced by this port's LGPL notice. The manual
+is (c) Ad Infinitum Programs, included under the 2015 LGPL source release; explicit permission
+has been requested from Nico de Vries.
+
+The terminal code in `cmd/uc2/internal/term` is derived from `golang.org/x/term`, (c) The Go
+Authors, under its BSD license (`cmd/uc2/internal/term/LICENSE`, in release archives
+`third_party/golang.org/x/term/LICENSE`).

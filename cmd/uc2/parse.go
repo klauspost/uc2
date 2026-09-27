@@ -17,7 +17,8 @@ const (
 )
 
 type cmd struct {
-	op          byte // A D E L V T P U O R
+	op          byte // A D E L V T P U O R, or ~
+	tilde       byte // the letter of a ~ command: D X R K V M ~
 	name        string
 	freshen     bool
 	move        bool
@@ -42,12 +43,16 @@ type cmd struct {
 type globals struct {
 	verbosity     int
 	help, version bool
+	color         string // --color: auto, always or never
 }
 
-// atom is a command line word. Literal atoms follow "--" and have no special meaning.
+// atom is a command line word. Literal atoms follow "--" and have no special
+// meaning. Script words are never GNU flags: UC2 scripts had none, and Total
+// Commander's lists hold names such as -F.
 type atom struct {
-	s   string
-	lit bool
+	s      string
+	lit    bool
+	script bool
 }
 
 var commandAliases = map[string]byte{
@@ -66,7 +71,7 @@ var shortFlags = map[string]string{
 }
 
 var valueFlags = map[string]bool{
-	"level": true, "dest": true, "exclude": true, "rev": true, "charset": true, "threads": true, "comment-file": true,
+	"level": true, "dest": true, "exclude": true, "rev": true, "charset": true, "threads": true, "comment-file": true, "color": true,
 }
 
 // Extended options of the original that are not implemented.
@@ -77,16 +82,35 @@ var unsupportedExt = map[string]bool{
 	"ELD": true, "EED": true, "FILTER": true,
 }
 
+// isHelpWord reports whether s asks for help: --help, or like UC2
+// (MAIN.CPP:1311) any word that starts with ?, h or H, possibly after a
+// '-' or '/'. No command starts so.
 func isHelpWord(s string) bool {
-	switch strings.ToLower(s) {
-	case "?", "-?", "/?", "-h", "/h", "-help", "--help", "help":
+	if strings.EqualFold(s, "--help") {
 		return true
 	}
-	return false
+	if optionPrefix(s) {
+		s = s[1:]
+	}
+	return s != "" && strings.IndexByte("?hH", s[0]) >= 0
 }
 
 func optionPrefix(s string) bool {
 	return len(s) > 1 && (s[0] == '-' || s[0] == '/' && runtime.GOOS == "windows")
+}
+
+// commandWord returns the word of the first command: the first word after
+// the leading flags and their values.
+func commandWord(args []string) string {
+	for i := 0; i < len(args); i++ {
+		if !isFlag(args[i], false) {
+			return args[i]
+		}
+		if name, _, hasVal := strings.Cut(args[i][2:], "="); valueFlags[strings.ToLower(name)] && !hasVal {
+			i++
+		}
+	}
+	return ""
 }
 
 func parseArgs(args []string) ([]*cmd, globals, error) {
@@ -118,13 +142,14 @@ func parseArgs(args []string) ([]*cmd, globals, error) {
 // that name existing files but would otherwise be special.
 func expandScripts(args []string) ([]atom, error) {
 	var out []atom
-	lit, scripts, top := false, 0, true
-	var walk func([]string) error
-	walk = func(list []string) error {
-		for _, s := range list {
+	lit, scripts := false, 0
+	var walk func([]atom, bool) error
+	walk = func(list []atom, top bool) error {
+		for _, at := range list {
+			s := at.s
 			switch {
-			case lit || top && shellName(s):
-				out = append(out, atom{s, true})
+			case lit || at.lit || top && shellName(s):
+				out = append(out, atom{s: s, lit: true})
 			case s == "--":
 				lit = true
 			case len(s) > 1 && s[0] == '@':
@@ -135,20 +160,20 @@ func expandScripts(args []string) ([]atom, error) {
 				if err != nil {
 					return err
 				}
-				prev := top
-				top = false
-				err = walk(words)
-				top = prev
-				if err != nil {
+				if err := walk(words, false); err != nil {
 					return err
 				}
 			default:
-				out = append(out, atom{s, false})
+				out = append(out, atom{s: s, script: !top})
 			}
 		}
 		return nil
 	}
-	return out, walk(args)
+	top := make([]atom, len(args))
+	for i, s := range args {
+		top[i].s = s
+	}
+	return out, walk(top, true)
 }
 
 // shellName reports whether s is an existing file with a name that starts
@@ -163,14 +188,32 @@ func shellName(s string) bool {
 	return err == nil
 }
 
-func readScript(name string) ([]string, error) {
+// readScript returns the words of a script. A line naming an existing file
+// is one literal word: Total Commander lists names one per line, unquoted,
+// and names such as "#1 draft.txt" or "@x" must stay names.
+func readScript(name string) ([]atom, error) {
 	for _, n := range []string{name + ".USC", name} {
-		if b, err := os.ReadFile(n); err == nil {
-			return strings.FieldsFunc(string(b), func(r rune) bool { return unicode.IsSpace(r) || r == 0x1A }), nil
+		b, err := os.ReadFile(n)
+		if err != nil {
+			continue
 		}
+		var words []atom
+		for line := range strings.Lines(string(b)) {
+			line = strings.TrimFunc(line, scriptSpace)
+			if _, err := os.Lstat(line); err == nil {
+				words = append(words, atom{s: line, lit: true})
+				continue
+			}
+			for _, w := range strings.FieldsFunc(line, scriptSpace) {
+				words = append(words, atom{s: w})
+			}
+		}
+		return words, nil
 	}
 	return nil, fatalf(sevCmdLine, "cannot find script file %s", name)
 }
+
+func scriptSpace(r rune) bool { return unicode.IsSpace(r) || r == 0x1A }
 
 // isFlag reports whether s is a GNU style flag. Short flags are only
 // recognized after the command, where "-x" would otherwise be the command X.
@@ -190,7 +233,7 @@ func parseCmd(seg []atom, g *globals) (*cmd, error) {
 	var pos []atom
 	for i := 0; i < len(seg); i++ {
 		at := seg[i]
-		if at.lit || !isFlag(at.s, len(pos) > 0) {
+		if at.lit || at.script || !isFlag(at.s, len(pos) > 0) {
 			pos = append(pos, at)
 			continue
 		}
@@ -217,6 +260,9 @@ func parseCmd(seg []atom, g *globals) (*cmd, error) {
 	}
 	if err := c.parseCommand(pos[0].s); err != nil {
 		return nil, err
+	}
+	if c.op == '~' && c.tilde != 'D' {
+		return c, c.tildeArgs(pos[1:])
 	}
 	i := 1
 options:
@@ -259,7 +305,26 @@ options:
 			c.specs = append(c.specs, s)
 		}
 	}
+	if c.op == '~' {
+		return c, nil // ~D accepts options without using them
+	}
 	return c, c.validate()
+}
+
+// tildeArgs takes the words of ~X, ~R, ~K and ~V verbatim, like UC2, but
+// rejects more words, which UC2 would run as the next command.
+func (c *cmd) tildeArgs(words []atom) error {
+	need := map[byte][]string{'X': {"archive", "dumpfile"}, 'R': {"archive", "dumpfile"}, 'K': {"path"}, 'V': {"file"}}[c.tilde]
+	for i, what := range need {
+		if i >= len(words) || words[i].s == "" {
+			return fatalf(sevCmdLine, "no %s specified", what)
+		}
+		c.specs = append(c.specs, words[i].s)
+	}
+	if len(words) > len(need) {
+		return fatalf(sevCmdLine, "unexpected parameter %s", words[len(need)].s)
+	}
+	return nil
 }
 
 func (c *cmd) setFlag(name, val string, g *globals) error {
@@ -319,6 +384,11 @@ func (c *cmd) setFlag(name, val string, g *globals) error {
 		c.threads = n
 	case "comment-file":
 		c.commentFile = val
+	case "color":
+		if val != "auto" && val != "always" && val != "never" {
+			return fatalf(sevCmdLine, "invalid color mode %q (use auto, always or never)", val)
+		}
+		g.color = val
 	case "verbose":
 		g.verbosity = verbose
 	case "quiet":
@@ -349,7 +419,20 @@ func (c *cmd) parseCommand(word string) error {
 	op := upper(w[0])
 	switch op {
 	case 'A', 'M', 'F', 'D', 'E', 'X', 'L', 'V', 'T', 'P', 'U', 'O', 'R':
-	case 'C', '$', '~':
+	case '~':
+		if len(w) > 1 {
+			c.tilde = upper(w[1])
+		}
+		c.op = op
+		switch c.tilde {
+		case 'D':
+			c.recurse = true
+			return c.parseLetters(w[2:])
+		case 'X', 'R', 'K', 'V', 'M', '~': // the rest of ~M and ~~ is ignored
+			return nil
+		}
+		return fatalf(sevCmdLine, "unknown command %s", word)
+	case 'C', '$':
 		return fatalf(sevCmdLine, "command %s is not supported", word)
 	default:
 		return fatalf(sevCmdLine, "unknown command %s", word)

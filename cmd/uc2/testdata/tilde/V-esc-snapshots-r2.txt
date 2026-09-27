@@ -1,0 +1,364 @@
+======== snapshot 00
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                  33%
+  |{Black/LightGray} README.TXT                                                                  33%
+01|1. TEST DOCUMENT: viewer test for UC ~V
+  |{White/Blue}1. TEST DOCUMENT: viewer test for UC ~V
+02|==========================================
+  |{White/Blue}==========================================
+03|
+  |{LightCyan/Blue}
+04|Introduction text line 4.
+  |{LightCyan/Blue}Introduction text line 4.
+05|Introduction text line 5.
+  |{LightCyan/Blue}Introduction text line 5.
+06|Introduction text line 6.
+  |{LightCyan/Blue}Introduction text line 6.
+07|Introduction text line 7.
+  |{LightCyan/Blue}Introduction text line 7.
+08|Introduction text line 8.
+  |{LightCyan/Blue}Introduction text line 8.
+09|Introduction text line 9.
+  |{LightCyan/Blue}Introduction text line 9.
+10|Introduction text line 10.
+  |{LightCyan/Blue}Introduction text line 10.
+11|Introduction text line 11.
+  |{LightCyan/Blue}Introduction text line 11.
+12|Introduction text line 12.
+  |{LightCyan/Blue}Introduction text line 12.
+13|Introduction text line 13.
+  |{LightCyan/Blue}Introduction text line 13.
+14|Introduction text line 14.
+  |{LightCyan/Blue}Introduction text line 14.
+15|Introduction text line 15.
+  |{LightCyan/Blue}Introduction text line 15.
+16|Introduction text line 16.
+  |{LightCyan/Blue}Introduction text line 16.
+17|Introduction text line 17.
+  |{LightCyan/Blue}Introduction text line 17.
+18|Introduction text line 18.
+  |{LightCyan/Blue}Introduction text line 18.
+19|Introduction text line 19.
+  |{LightCyan/Blue}Introduction text line 19.
+20|Introduction text line 20.
+  |{LightCyan/Blue}Introduction text line 20.
+21|Introduction text line 21.
+  |{LightCyan/Blue}Introduction text line 21.
+22|Introduction text line 22.
+  |{LightCyan/Blue}Introduction text line 22.
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 01
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                 100%
+  |{Black/LightGray} README.TXT                                                                 100%
+01|1.B SECOND PARAGRAPH.
+  |{White/Blue}1.B SECOND PARAGRAPH.
+02|=====================
+  |{White/Blue}=====================
+03|A line with a TAB:○here.
+  |{LightCyan/Blue}A line with a TAB:○here.
+04|Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+  |{LightCyan/Blue}Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+05|8901234567890123456789
+  |{LightCyan/Blue}8901234567890123456789
+06|
+  |{LightCyan/Blue}
+07|Second paragraph line 1.
+  |{LightCyan/Blue}Second paragraph line 1.
+08|Second paragraph line 2.
+  |{LightCyan/Blue}Second paragraph line 2.
+09|Second paragraph line 3.
+  |{LightCyan/Blue}Second paragraph line 3.
+10|Second paragraph line 4.
+  |{LightCyan/Blue}Second paragraph line 4.
+11|Second paragraph line 5.
+  |{LightCyan/Blue}Second paragraph line 5.
+12|Second paragraph line 6.
+  |{LightCyan/Blue}Second paragraph line 6.
+13|Second paragraph line 7.
+  |{LightCyan/Blue}Second paragraph line 7.
+14|Second paragraph line 8.
+  |{LightCyan/Blue}Second paragraph line 8.
+15|Second paragraph line 9.
+  |{LightCyan/Blue}Second paragraph line 9.
+16|Second paragraph line 10.
+  |{LightCyan/Blue}Second paragraph line 10.
+17|1.Z SUMMARY.
+  |{White/Blue}1.Z SUMMARY.
+18|============
+  |{White/Blue}============
+19|Summary line 1.
+  |{LightCyan/Blue}Summary line 1.
+20|
+  |{LightCyan/Blue}
+21|
+  |{LightCyan/Blue}
+22|
+  |{LightCyan/Blue}
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 02
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                 100%
+  |{Black/LightGray} README.TXT                                                                 100%
+01|1.B SECOND PARAGRAPH.
+  |{White/Blue}1.B SECOND PARAGRAPH.
+02|=====================
+  |{White/Blue}=====================
+03|A line with a TAB:○here.
+  |{LightCyan/Blue}A line with a TAB:○here.
+04|Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+  |{LightCyan/Blue}Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+05|8901234567890123456789
+  |{LightCyan/Blue}8901234567890123456789
+06|
+  |{LightCyan/Blue}
+07|Second paragraph line 1.
+  |{LightCyan/Blue}Second paragraph line 1.
+08|Second paragraph line 2.
+  |{LightCyan/Blue}Second paragraph line 2.
+09|Second paragraph line 3.
+  |{LightCyan/Blue}Second paragraph line 3.
+10|Second paragraph line 4.
+  |{LightCyan/Blue}Second paragraph line 4.
+11|Second paragraph line 5.
+  |{LightCyan/Blue}Second paragraph line 5.
+12|Second paragraph line 6.
+  |{LightCyan/Blue}Second paragraph line 6.
+13|Second paragraph line 7.
+  |{LightCyan/Blue}Second paragraph line 7.
+14|Second paragraph line 8.
+  |{LightCyan/Blue}Second paragraph line 8.
+15|Second paragraph line 9.
+  |{LightCyan/Blue}Second paragraph line 9.
+16|Second paragraph line 10.
+  |{LightCyan/Blue}Second paragraph line 10.
+17|1.Z SUMMARY.
+  |{White/Blue}1.Z SUMMARY.
+18|============
+  |{White/Blue}============
+19|Summary line 1.
+  |{LightCyan/Blue}Summary line 1.
+20|
+  |{LightCyan/Blue}
+21|
+  |{LightCyan/Blue}
+22|
+  |{LightCyan/Blue}
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 03
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                 100%
+  |{Black/LightGray} README.TXT                                                                 100%
+01|1.B SECOND PARAGRAPH.
+  |{White/Blue}1.B SECOND PARAGRAPH.
+02|=====================
+  |{White/Blue}=====================
+03|A line with a TAB:○here.
+  |{LightCyan/Blue}A line with a TAB:○here.
+04|Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+  |{LightCyan/Blue}Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+05|8901234567890123456789
+  |{LightCyan/Blue}8901234567890123456789
+06|
+  |{LightCyan/Blue}
+07|Second paragraph line 1.
+  |{LightCyan/Blue}Second paragraph line 1.
+08|Second paragraph line 2.
+  |{LightCyan/Blue}Second paragraph line 2.
+09|Second paragraph line 3.
+  |{LightCyan/Blue}Second paragraph line 3.
+10|Second paragraph line 4.
+  |{LightCyan/Blue}Second paragraph line 4.
+11|Second paragraph line 5.
+  |{LightCyan/Blue}Second paragraph line 5.
+12|Second paragraph line 6.
+  |{LightCyan/Blue}Second paragraph line 6.
+13|Second paragraph line 7.
+  |{LightCyan/Blue}Second paragraph line 7.
+14|Second paragraph line 8.
+  |{LightCyan/Blue}Second paragraph line 8.
+15|Second paragraph line 9.
+  |{LightCyan/Blue}Second paragraph line 9.
+16|Second paragraph line 10.
+  |{LightCyan/Blue}Second paragraph line 10.
+17|1.Z SUMMARY.
+  |{White/Blue}1.Z SUMMARY.
+18|============
+  |{White/Blue}============
+19|Summary line 1.
+  |{LightCyan/Blue}Summary line 1.
+20|
+  |{LightCyan/Blue}
+21|
+  |{LightCyan/Blue}
+22|
+  |{LightCyan/Blue}
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 04
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                 100%
+  |{Black/LightGray} README.TXT                                                                 100%
+01|1.B SECOND PARAGRAPH.
+  |{White/Blue}1.B SECOND PARAGRAPH.
+02|=====================
+  |{White/Blue}=====================
+03|A line with a TAB:○here.
+  |{LightCyan/Blue}A line with a TAB:○here.
+04|Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+  |{LightCyan/Blue}Long: 01234567890123456789012345678901234567890123456789012345678901234567890123
+05|8901234567890123456789
+  |{LightCyan/Blue}8901234567890123456789
+06|
+  |{LightCyan/Blue}
+07|Second paragraph line 1.
+  |{LightCyan/Blue}Second paragraph line 1.
+08|Second paragraph line 2.
+  |{LightCyan/Blue}Second paragraph line 2.
+09|Second paragraph line 3.
+  |{LightCyan/Blue}Second paragraph line 3.
+10|Second paragraph line 4.
+  |{LightCyan/Blue}Second paragraph line 4.
+11|Second paragraph line 5.
+  |{LightCyan/Blue}Second paragraph line 5.
+12|Second paragraph line 6.
+  |{LightCyan/Blue}Second paragraph line 6.
+13|Second paragraph line 7.
+  |{LightCyan/Blue}Second paragraph line 7.
+14|Second paragraph line 8.
+  |{LightCyan/Blue}Second paragraph line 8.
+15|Second paragraph line 9.
+  |{LightCyan/Blue}Second paragraph line 9.
+16|Second paragraph line 10.
+  |{LightCyan/Blue}Second paragraph line 10.
+17|1.Z SUMMARY.
+  |{White/Blue}1.Z SUMMARY.
+18|============
+  |{White/Blue}============
+19|Summary line 1.
+  |{LightCyan/Blue}Summary line 1.
+20|
+  |{LightCyan/Blue}
+21|
+  |{LightCyan/Blue}
+22|
+  |{LightCyan/Blue}
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 05
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                  33%
+  |{Black/LightGray} README.TXT                                                                  33%
+01|1. TEST DOCUMENT: viewer test for UC ~V
+  |{White/Blue}1. TEST DOCUMENT: viewer test for UC ~V
+02|==========================================
+  |{White/Blue}==========================================
+03|
+  |{LightCyan/Blue}
+04|Introduction text line 4.
+  |{LightCyan/Blue}Introduction text line 4.
+05|Introduction text line 5.
+  |{LightCyan/Blue}Introduction text line 5.
+06|Introduction text line 6.
+  |{LightCyan/Blue}Introduction text line 6.
+07|Introduction text line 7.
+  |{LightCyan/Blue}Introduction text line 7.
+08|Introduction text line 8.
+  |{LightCyan/Blue}Introduction text line 8.
+09|Introduction text line 9.
+  |{LightCyan/Blue}Introduction text line 9.
+10|Introduction text line 10.
+  |{LightCyan/Blue}Introduction text line 10.
+11|Introduction text line 11.
+  |{LightCyan/Blue}Introduction text line 11.
+12|Introduction text line 12.
+  |{LightCyan/Blue}Introduction text line 12.
+13|Introduction text line 13.
+  |{LightCyan/Blue}Introduction text line 13.
+14|Introduction text line 14.
+  |{LightCyan/Blue}Introduction text line 14.
+15|Introduction text line 15.
+  |{LightCyan/Blue}Introduction text line 15.
+16|Introduction text line 16.
+  |{LightCyan/Blue}Introduction text line 16.
+17|Introduction text line 17.
+  |{LightCyan/Blue}Introduction text line 17.
+18|Introduction text line 18.
+  |{LightCyan/Blue}Introduction text line 18.
+19|Introduction text line 19.
+  |{LightCyan/Blue}Introduction text line 19.
+20|Introduction text line 20.
+  |{LightCyan/Blue}Introduction text line 20.
+21|Introduction text line 21.
+  |{LightCyan/Blue}Introduction text line 21.
+22|Introduction text line 22.
+  |{LightCyan/Blue}Introduction text line 22.
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}
+======== snapshot 06
+cols=80 rows=25 cursor=(row 23, col 0)
+00| README.TXT                                                                 100%
+  |{Black/LightGray} README.TXT                                                                 100%
+01|1.Z SUMMARY.
+  |{White/Blue}1.Z SUMMARY.
+02|============
+  |{White/Blue}============
+03|Summary line 1.
+  |{LightCyan/Blue}Summary line 1.
+04|
+  |{LightCyan/Blue}
+05|
+  |{LightCyan/Blue}
+06|
+  |{LightCyan/Blue}
+07|
+  |{LightCyan/Blue}
+08|
+  |{LightCyan/Blue}
+09|
+  |{LightCyan/Blue}
+10|
+  |{LightCyan/Blue}
+11|
+  |{LightCyan/Blue}
+12|
+  |{LightCyan/Blue}
+13|
+  |{LightCyan/Blue}
+14|
+  |{LightCyan/Blue}
+15|
+  |{LightCyan/Blue}
+16|
+  |{LightCyan/Blue}
+17|
+  |{LightCyan/Blue}
+18|
+  |{LightCyan/Blue}
+19|
+  |{LightCyan/Blue}
+20|
+  |{LightCyan/Blue}
+21|
+  |{LightCyan/Blue}
+22|
+  |{LightCyan/Blue}
+23| Tab summary & exit  Esc exit  A-Z jump  + 50 lines  ↑ ↓ PgUp PgDn
+  |{Red/LightGray} Tab {Black/LightGray}summary & exit  {Red/LightGray}Esc {Black/LightGray}exit  {Red/LightGray}A-Z {Black/LightGray}jump  {Red/LightGray}+ {Black/LightGray}50 lines  {Red/LightGray}↑ ↓ PgUp PgDn  {Black/LightGray}
+24|
+  |{LightGray}

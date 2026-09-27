@@ -1,0 +1,74 @@
+LIST [\]
+   FILE
+      NAME=[WEIRD.TXT]
+      VERSION=0
+      SIZE=9
+      CHECK=C400E2F75BAD
+      DATE(MDY)=13 00 2024
+      TIME(HMS)=31 63 62
+      ATTRIB=ARSH
+   FILE
+      NAME=[ZERO.TXT]
+      VERSION=0
+      SIZE=8
+      CHECK=AF2489D33088
+      DATE(MDY)=00 00 1980
+      TIME(HMS)=00 00 00
+      ATTRIB=
+   FILE
+      NAME=[EMPTYLN.TXT]
+      LONGNAME=[]
+      VERSION=0
+      SIZE=11
+      CHECK=8658A0AF19F7
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[UTFONLY.TXT]
+      VERSION=0
+      SIZE=11
+      CHECK=845EA2A91BF1
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+   FILE
+      NAME=[THREE.TXT]
+      VERSION=0
+      SIZE=9
+      CHECK=DE19F8EE41B4
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[TEST:C]
+      TAG=[TEST:B]
+      TAG=[TEST:A]
+   FILE
+      NAME=[DUP.TXT]
+      VERSION=0
+      SIZE=7
+      CHECK=864EA0B919ED
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[TEST:D]
+      TAG=[TEST:D]
+   FILE
+      NAME=[LONG15.TXT]
+      VERSION=0
+      SIZE=10
+      CHECK=981FBEE807B1
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[Comment]
+      TAG=[123456789012345]
+END
+SPEC-SECTION
+    DAMPRO = 0
+    VOLLABEL = "lbl x!     "
+    SERIAL = 1
+    UC2-REVISION = 5
+END

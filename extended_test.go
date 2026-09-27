@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"sort"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/klauspost/uc2/internal/format"
@@ -48,7 +49,7 @@ func (s *sparseFile) ReadAt(p []byte, off int64) (int, error) {
 	for k := range s.chunks {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	slices.Sort(keys)
 	for _, k := range keys {
 		c := s.chunks[k]
 		lo, hi := max(k, off), min(k+int64(len(c)), off+int64(len(p)))
@@ -127,13 +128,13 @@ func TestExtendedMode(t *testing.T) {
 }
 
 func TestDeepPathExtended(t *testing.T) {
-	name := ""
+	var name strings.Builder
 	for range 12 {
-		name += "directory/"
+		name.WriteString("directory/")
 	}
 	var m memFile
 	w := NewWriter(&m)
-	ew, _ := w.Create(name + "file.txt")
+	ew, _ := w.Create(name.String() + "file.txt")
 	ew.Write([]byte("deep"))
 	w.Close()
 	r, err := NewReader(bytes.NewReader(m.b), int64(len(m.b)))

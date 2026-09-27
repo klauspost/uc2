@@ -8,7 +8,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w
+      - -s -w -X main.buildVersion={{ .Version }}
     goos: [linux, windows, darwin, freebsd, openbsd, netbsd]
     goarch: [amd64, arm64, "386", arm, riscv64]
     goarm: ["6", "7"]
@@ -38,6 +38,9 @@ archives:
       - README.md
       - LICENSE
       - COPYING
+      - src: cmd/uc2/internal/term/LICENSE
+        dst: third_party/golang.org/x/term
+        strip_parent: true
 
 checksum:
   name_template: checksums.txt

@@ -1,0 +1,73 @@
+LIST [\]
+   DIR
+      NAME=[LONGDI~1]
+      LONGNAME=[Long Directory Name]
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[ALONGF~1.TXT]
+      LONGNAME=[A long file name.txt]
+      VERSION=0
+      SIZE=11
+      CHECK=A37685813CD9
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[CAF‚CR~1.TXT]
+      LONGNAME=[Caf‚ crŠme.txt]
+      VERSION=0
+      SIZE=17
+      CHECK=E036C6C17F83
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[LOWER.TXT]
+      LONGNAME=[lower.txt]
+      VERSION=0
+      SIZE=21
+      CHECK=8E03A8F411B2
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[MULTI~1.TXT]
+      LONGNAME=[multi.part.name.txt]
+      VERSION=0
+      SIZE=6
+      CHECK=B34795B02CE5
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[UPPER.TXT]
+      VERSION=0
+      SIZE=16
+      CHECK=8020A6D71F94
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+LIST [\LONGDI~1\]
+   FILE
+      NAME=[ANOTHE~1.DAT]
+      LONGNAME=[Another Long Name.dat]
+      VERSION=0
+      SIZE=25
+      CHECK=8345A5B21CF8
+      DATE(MDY)=01 02 2025
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+      TAG=[Win95 LongN]
+END
+SPEC-SECTION
+    DAMPRO = 0
+    SERIAL = 0
+    UC2-REVISION = 3
+END

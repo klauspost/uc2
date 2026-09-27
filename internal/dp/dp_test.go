@@ -83,7 +83,7 @@ func TestRepair(t *testing.T) {
 	out := protect(data)
 	secs, drs := Geometry(int64(len(data)))
 	damaged := bytes.Clone(out)
-	for i := int64(0); i < drs; i++ {
+	for i := range drs {
 		damaged[(100+i)*sector+17] ^= 0xFF
 	}
 	res, _ := Verify(bytes.NewReader(damaged), int64(len(data)))

@@ -1,0 +1,24 @@
+LIST [\]
+   DIR
+      NAME=[STRA·E]
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[U$~COMM.TXT]
+      VERSION=0
+      SIZE=17
+      CHECK=8841AEB617F4
+      DATE(MDY)=09 27 2026
+      TIME(HMS)=14 29 28
+      ATTRIB=A
+LIST [\STRA·E\]
+END
+SPEC-SECTION
+    DAMPRO = 0
+    VOLLABEL = "GOLABEL    "
+    SERIAL = 0
+    UC2-REVISION = 2
+END

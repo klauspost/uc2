@@ -45,9 +45,10 @@ type adder struct {
 	skipped      int64
 	skippedBytes int64
 
-	pat     *mask
-	prefix  string
-	matched bool
+	pat       *mask
+	prefix    string
+	matched   bool
+	unmatched []string // specifications without files, reported after writing
 }
 
 func (a *app) add(c *cmd, arch string) error {
@@ -93,19 +94,34 @@ func (a *app) add(c *cmd, arch string) error {
 	if len(specs) == 0 {
 		specs = []string{"*.*"}
 	}
+	a.normalf(cN + "Scanning ")
+	a.startBar(lvNormal, -1)
 	for _, s := range specs {
 		ad.scan(s)
 	}
+	a.endBar()
+	a.endLine(lvNormal)
+	if ad.skipped > 0 {
+		a.printf(cOK+"Smart skipping %s bytes\n", neat(ad.skippedBytes))
+	}
+	a.phase(lvNormal, "Analyzing", nil)
 
 	protected := r != nil && r.Protected
-	if len(ad.items) == 0 && (r == nil || *c.protection(protected) == protected) {
-		ad.report()
-		return nil
-	}
-	if r != nil && c.incremental {
+	prot := c.protection(protected)
+	err = nil
+	switch {
+	case len(ad.items) == 0 && (r == nil || *prot == protected):
+		if r != nil {
+			a.unchanged(r)
+		}
+	case r != nil && c.incremental:
+		t := &tally{}
+		for _, f := range r.File {
+			t.add(f)
+		}
 		r.Close()
-		err = ad.appendTo(arch)
-	} else {
+		err = ad.appendTo(arch, t, *prot)
+	default:
 		replaced := map[*uc2.File]bool{}
 		for _, it := range ad.items {
 			if it.old != nil {
@@ -113,31 +129,26 @@ func (a *app) add(c *cmd, arch string) error {
 			}
 		}
 		err = a.rewrite(arch, r, func(f *uc2.File) bool { return replaced[f] },
-			func(w *uc2.Writer) error { return ad.write(w, r != nil) }, c.opts(c.protection(protected)))
+			func(w *uc2.Writer, t *tally) error { return ad.write(w, r != nil, t) }, c.opts(prot), *prot)
 	}
 	if err != nil {
 		return err
 	}
-	ad.report()
-	a.contents(c, arch)
+	for _, s := range ad.unmatched {
+		a.warnf(sevNoMatch, "no file found matching %s", s)
+	}
 	a.moveFiles(ad.moves)
 	return nil
 }
 
-func (ad *adder) report() {
-	if ad.skipped > 0 {
-		ad.a.printf("Smart skipped %s (%s)\n", plural(ad.skipped, "file", "files"), plural(ad.skippedBytes, "byte", "bytes"))
-	}
-}
-
 func destPrefix(dest string) string {
-	var p string
-	for _, e := range strings.Split(strings.ReplaceAll(dest, `\`, "/"), "/") {
+	var p strings.Builder
+	for e := range strings.SplitSeq(strings.ReplaceAll(dest, `\`, "/"), "/") {
 		if e != "" && e != "." {
-			p += e + "/"
+			p.WriteString(e + "/")
 		}
 	}
-	return p
+	return p.String()
 }
 
 // scan selects the files of one disk specification. The directory part of
@@ -155,7 +166,7 @@ func (ad *adder) scan(spec string) {
 	ad.pat = newMask(pat)
 	ad.prefix = destPrefix(ad.c.dest)
 	if ad.c.destSrc {
-		for _, e := range strings.Split(filepath.ToSlash(strings.TrimPrefix(base, filepath.VolumeName(base))), "/") {
+		for e := range strings.SplitSeq(filepath.ToSlash(strings.TrimPrefix(base, filepath.VolumeName(base))), "/") {
 			if e != "" && e != "." && e != ".." {
 				ad.prefix += e + "/"
 			}
@@ -166,9 +177,10 @@ func (ad *adder) scan(spec string) {
 	if root, err := os.OpenRoot(base); err == nil {
 		ad.root = root
 		ad.roots = append(ad.roots, root)
-		entries, _ = ad.readDir(".")
+		entries, _ = ad.readDir(base, ".")
 	}
 	for _, e := range entries {
+		ad.a.hint(0)
 		disk := filepath.Join(base, e.Name())
 		fi, ok := ad.stat(disk, e.Name())
 		if !ok {
@@ -183,7 +195,7 @@ func (ad *adder) scan(spec string) {
 		}
 	}
 	if !ad.matched {
-		ad.a.warnf(sevNoMatch, "no file found matching %s", spec)
+		ad.unmatched = append(ad.unmatched, spec)
 	}
 }
 
@@ -201,12 +213,13 @@ func (ad *adder) walk(disk, rel, name string, fi fs.FileInfo, all bool, pending 
 	} else {
 		pending = append(pending, d)
 	}
-	entries, err := ad.readDir(rel)
+	entries, err := ad.readDir(disk, rel)
 	if err != nil {
 		ad.a.warnf(sevSkipped, "skipped directory %s (%v)", disk, err)
 		return
 	}
 	for _, e := range entries {
+		ad.a.hint(0)
 		p, r := filepath.Join(disk, e.Name()), filepath.Join(rel, e.Name())
 		cfi, ok := ad.stat(p, r)
 		switch {
@@ -219,16 +232,23 @@ func (ad *adder) walk(disk, rel, name string, fi fs.FileInfo, all bool, pending 
 	}
 }
 
-// readDir lists a directory of the scanned tree in name order.
-func (ad *adder) readDir(rel string) ([]fs.DirEntry, error) {
-	d, err := ad.root.Open(rel)
-	if err != nil {
-		return nil, err
+// readDir lists a directory of the scanned tree in name order. Verbose
+// output shows each directory, like UC2.
+func (ad *adder) readDir(disk, rel string) (entries []fs.DirEntry, err error) {
+	list := func() error {
+		d, err := ad.root.Open(rel)
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		entries, err = d.ReadDir(-1)
+		slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+		return err
 	}
-	defer d.Close()
-	entries, err := d.ReadDir(-1)
-	slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
-	return entries, err
+	if ad.a.allowed(lvVerbose) {
+		return entries, ad.a.phase(lvVerbose, "Scanning "+dispDir(disk), list)
+	}
+	return entries, list()
 }
 
 func (ad *adder) stat(p, rel string) (fs.FileInfo, bool) {
@@ -399,7 +419,7 @@ func (ad *adder) conflict(name string) bool {
 
 // validName reports whether the library accepts name as an archive path.
 func validName(name string) bool {
-	for _, e := range strings.Split(strings.TrimSuffix(name, "/"), "/") {
+	for e := range strings.SplitSeq(strings.TrimSuffix(name, "/"), "/") {
 		if e == "" || e == "." || e == ".." || len(e) > 255 || strings.ContainsAny(e, "\\\x00") || !utf8.ValidString(e) {
 			return false
 		}
@@ -409,7 +429,8 @@ func validName(name string) bool {
 
 // write adds the selected items. If a file cannot be opened, restore keeps
 // the archived revision it would have replaced.
-func (ad *adder) write(w *uc2.Writer, restore bool) error {
+func (ad *adder) write(w *uc2.Writer, restore bool, t *tally) error {
+	a := ad.a
 	for _, it := range ad.items {
 		if strings.HasSuffix(it.name, "/") {
 			fh := &uc2.FileHeader{Name: it.name, Modified: time.Now(), Attr: uc2.AttrDir}
@@ -420,15 +441,17 @@ func (ad *adder) write(w *uc2.Writer, restore bool) error {
 			if _, err := w.CreateHeader(fh); err != nil {
 				return err
 			}
+			t.dirs++
 			continue
 		}
 		f, fi, err := it.open()
 		if err != nil {
-			ad.a.warnf(sevSkipped, "skipped file %s (%v)", it.disk, err)
+			a.warnf(sevSkipped, "skipped file %s (%v)", it.disk, err)
 			if it.old != nil && restore {
 				if err := w.Copy(it.old); err != nil {
 					return err
 				}
+				t.add(it.old)
 			}
 			continue
 		}
@@ -437,16 +460,25 @@ func (ad *adder) write(w *uc2.Writer, restore bool) error {
 		if it.old != nil {
 			fh.ShortName = it.old.ShortName
 		}
+		name := disp(filepath.ToSlash(it.disk), 0) // UC2 shows the disk path
+		a.printf(cN+"Compressing %s ", name)
+		a.quietf(cN+"Add %s ", name)
+		a.startBar(lvStd, fi.Size())
 		ew, err := w.CreateHeader(fh)
 		var n int64
 		if err == nil {
-			n, err = io.Copy(ew, io.LimitReader(f, fi.Size()))
+			n, err = io.Copy(hinter{ew, a}, io.LimitReader(f, fi.Size()))
 		}
 		f.Close()
 		if err != nil {
 			return fmt.Errorf("adding %s: %w", it.disk, err)
 		}
-		ad.a.say("Compressing %s DONE", "Add %s", disp(it.name, 0))
+		a.endBar()
+		a.printf(cOK + "DONE")
+		a.outf("\n")
+		t.files++
+		t.size += n
+		t.compressed = true
 		if ad.c.move && n == fi.Size() {
 			it.read = fi
 			ad.moves = append(ad.moves, it)
@@ -455,8 +487,9 @@ func (ad *adder) write(w *uc2.Writer, restore bool) error {
 	return nil
 }
 
-// appendTo adds the items in place, keeping all revisions (incremental mode).
-func (ad *adder) appendTo(arch string) error {
+// appendTo adds the items in place, keeping all revisions (incremental
+// mode). t counts the archived entries.
+func (ad *adder) appendTo(arch string, t *tally, protected bool) error {
 	f, err := os.OpenFile(arch, os.O_RDWR, 0)
 	if err != nil {
 		return fatalf(sevWrite, "cannot open %s for writing (%v)", arch, err)
@@ -474,13 +507,13 @@ func (ad *adder) appendTo(arch string) error {
 	if err != nil {
 		return appendErr(arch, err)
 	}
-	if err := ad.write(w, false); err != nil {
+	if err := ad.write(w, false, t); err != nil {
 		// Closing would commit the partial update; the appended data is unreferenced.
 		f.Truncate(fi.Size())
 		return writeErr(arch, err)
 	}
 	// Close rolls back itself if it fails before committing the new header.
-	if err := w.Close(); err != nil {
+	if err := ad.a.closeArchive(w, t, protected); err != nil {
 		return writeErr(arch, err)
 	}
 	return nil
@@ -492,8 +525,14 @@ func (a *app) moveFiles(files []*item) {
 	if len(files) == 0 {
 		return
 	}
-	a.printf("Moving files\n")
+	a.printf("\n" + cN + "Moving files ")
+	a.startBar(lvStd, -1)
+	defer func() {
+		a.endBar()
+		a.endLine(lvStd)
+	}()
 	for _, it := range files {
+		a.hint(0)
 		cur, err := it.root.Lstat(it.rel)
 		if err == nil && cur.Mode()&fs.ModeSymlink != 0 {
 			cur, err = it.root.Stat(it.rel) // deleting a link loses no data
@@ -508,38 +547,6 @@ func (a *app) moveFiles(files []*item) {
 			a.errorf(sevDelete, "failed to delete %s (%v)", it.disk, err)
 		}
 	}
-}
-
-// contents prints the totals of an updated archive.
-func (a *app) contents(c *cmd, arch string) {
-	r, err := uc2.OpenReader(arch, c.opts(nil)...)
-	if err != nil {
-		return
-	}
-	defer r.Close()
-	var files, dirs, size int64
-	for _, f := range r.File {
-		if isDir(f) {
-			dirs++
-		} else {
-			files++
-			size += f.Size
-		}
-	}
-	s := "is empty"
-	if files+dirs > 0 {
-		s = "contains"
-		if files > 0 {
-			s += " " + plural(files, "file", "files") + " (" + plural(size, "byte", "bytes") + ")"
-		}
-		if files > 0 && dirs > 0 {
-			s += " and"
-		}
-		if dirs > 0 {
-			s += " " + plural(dirs, "directory", "directories")
-		}
-	}
-	a.printf("Updated archive %s\n", s)
 }
 
 func plural(n int64, one, many string) string {

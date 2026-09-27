@@ -296,13 +296,19 @@ func (t *tree) selectFiles(c *cmd, masks, excl []*mask, defRev int, withDirs boo
 		if dir && excludedDir(excl, long, short) || !dir && excluded(excl, long, short) {
 			continue
 		}
+		found := false
 		for _, m := range masks {
 			if dir && !m.tree || !m.matchPath(long, short, c.recurse) || !dir && (!m.revOK(f.Revision, c.rev, defRev) || m.wild && isInternal(f)) {
 				continue
 			}
+			// As UC2, every mask that fits counts as used, not only the first.
 			if !dir {
 				m.used = true
 			}
+			if found {
+				continue
+			}
+			found = true
 			rel := strings.Join(long[len(m.dirs):], "/")
 			if c.destSrc {
 				rel = strings.Join(long, "/")
@@ -311,7 +317,6 @@ func (t *tree) selectFiles(c *cmd, masks, excl []*mask, defRev int, withDirs boo
 				rel += "/"
 			}
 			out = append(out, selected{f, rel})
-			break
 		}
 	}
 	return out

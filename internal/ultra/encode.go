@@ -102,7 +102,7 @@ func (e *Encoder) Encode(in *Input, out *Output) {
 	e.next += int32(len(e.buf)) + 1
 
 	if in.Dict == nil {
-		for i := 0; i < start; i++ {
+		for i := range start {
 			e.insert(i)
 		}
 	} else {

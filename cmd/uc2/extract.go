@@ -7,15 +7,18 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"math/rand/v2"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/klauspost/uc2"
 	"github.com/klauspost/uc2/internal/safename"
+	"github.com/klauspost/uc2/internal/tags"
 )
 
 func (a *app) extract(c *cmd, arch string) error {
@@ -32,15 +35,17 @@ func (a *app) extract(c *cmd, arch string) error {
 	}
 	masks := compileMasks(c.specs, "*.*")
 	sel := newTree(&r.Reader).selectFiles(c, masks, compileExcludes(c.excludes), 0, true)
+	extractOrder(r.File, sel)
+	a.phase(lvNormal, "Analyzing", nil)
 	if len(c.specs) > 0 {
-		a.warnUnmatched(masks)
+		defer a.warnUnmatched(masks)
 	}
 	if len(sel) == 0 {
 		return nil
 	}
 	dest := cmp.Or(c.dest, ".")
 	if err := os.MkdirAll(dest, 0o777); err != nil {
-		return fatalf(sevWrite, "cannot create directory %s (%v)", dest, err)
+		return fatalf(sevMkdir, "cannot create directory %s (%v)", dest, err)
 	}
 	root, err := os.OpenRoot(dest)
 	if err != nil {
@@ -81,6 +86,7 @@ func (a *app) extract(c *cmd, arch string) error {
 	if !c.move || len(done) == 0 {
 		return nil
 	}
+	a.phase(lvStd, "Moving files", nil)
 	// Move mode removes the revisions that are now on disk. Checking the
 	// disk again guards against files replaced through other names, such
 	// as Windows 8.3 aliases.
@@ -90,7 +96,8 @@ func (a *app) extract(c *cmd, arch string) error {
 			drop[d.f] = true
 		}
 	}
-	return a.rewrite(arch, r, func(f *uc2.File) bool { return drop[f] }, nil, c.opts(c.protection(r.Protected)))
+	prot := c.protection(r.Protected)
+	return a.rewrite(arch, r, func(f *uc2.File) bool { return drop[f] }, nil, c.opts(prot), *prot)
 }
 
 // diskPath returns the path below the destination for an archive path.
@@ -113,6 +120,47 @@ func (a *app) diskPath(rel string) (string, bool) {
 		rel = m
 	}
 	return strings.TrimSuffix(rel, "/"), true
+}
+
+// extractOrder sorts the files of sel as UC2 extracts them (SUPERMAN.CPP
+// ExtractFiles, NEUROMAN.CPP LocMacNtx and AddToNtx): by master, the one
+// first used last in the archive first; then files of 2,000 to 9,999 bytes,
+// of 10,000 bytes and more, and smaller ones, each in reverse archive order.
+// Files without a master come last, directories first.
+func extractOrder(files []*uc2.File, sel []selected) {
+	pos := make(map[*uc2.File]int, len(files))
+	first := map[uint32]int{}
+	for i, f := range files {
+		pos[f] = i
+		if p := tags.Record(f).Comp.Prefix; !isDir(f) && p > 1 {
+			if _, ok := first[p]; !ok {
+				first[p] = i
+			}
+		}
+	}
+	key := func(f *uc2.File) (group, size, at int) {
+		if isDir(f) {
+			return math.MinInt, 0, 0
+		}
+		switch p := tags.Record(f).Comp.Prefix; p {
+		case 0, 1: // SUPERMASTER after NOMASTER
+			group = 2 - int(p)
+		default:
+			group = -1 - first[p]
+		}
+		switch {
+		case f.Size < 2000:
+			size = 2
+		case f.Size >= 10000:
+			size = 1
+		}
+		return group, size, -pos[f]
+	}
+	slices.SortStableFunc(sel, func(a, b selected) int {
+		g1, s1, p1 := key(a.f)
+		g2, s2, p2 := key(b.f)
+		return cmp.Or(cmp.Compare(g1, g2), cmp.Compare(s1, s2), cmp.Compare(p1, p2))
+	})
 }
 
 // gitGuard allows writing below a .git element only if this run created
@@ -159,7 +207,7 @@ func (g *gitGuard) created(fresh []string) {
 func (a *app) extractFile(c *cmd, root *os.Root, s selected, target string, again bool) (bool, error) {
 	if isDir(s.f) {
 		if err := root.MkdirAll(target, 0o777); err != nil {
-			a.errorf(sevWrite, "cannot create directory %s (%v)", disp(target, 0), err)
+			a.errorf(sevMkdir, "cannot create directory %s (%v)", disp(target, 0), err)
 		}
 		return false, nil
 	}
@@ -169,7 +217,8 @@ func (a *app) extractFile(c *cmd, root *os.Root, s selected, target string, agai
 			return false, nil
 		}
 	}
-	name := dispFile(s.f)
+	// UC2 shows the disk path, including the destination.
+	name := disp(path.Join(filepath.ToSlash(c.dest), target), 0)
 	fi, err := root.Lstat(target)
 	exists := err == nil
 	if exists {
@@ -180,12 +229,12 @@ func (a *app) extractFile(c *cmd, root *os.Root, s selected, target string, agai
 		case !again && fi.Mode().IsRegular() && sameFile(s.f, fi.Size(), fi.ModTime()) && (!c.move || sameContent(root, target, s.f)):
 			// Move mode drops the revision from the archive, so the disk
 			// file must really hold it.
-			a.say("Smart skipping %s", "", name)
+			a.printf(cN+"Smart skipping %s "+cOK+"OK\n", name)
 			return true, nil
 		case c.newer && dosStamp(s.f.Modified) <= dosStamp(fi.ModTime()):
 			return false, nil
 		}
-		ok, err := a.confirmOverwrite(c, disp(target, 0))
+		ok, err := a.confirmOverwrite(c, name)
 		if !ok || err != nil {
 			return false, err
 		}
@@ -204,7 +253,10 @@ func (a *app) extractFile(c *cmd, root *os.Root, s selected, target string, agai
 		return false, nil
 	}
 	defer track(out, func() error { return root.Remove(tmp) })()
-	_, err = io.Copy(out, rc)
+	a.printf(cN+"Decompressing %s ", name)
+	a.quietf(cN+"Extract %s", name)
+	a.startBar(lvStd, s.f.Size)
+	_, err = io.Copy(hinter{out, a}, rc)
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
@@ -230,7 +282,9 @@ func (a *app) extractFile(c *cmd, root *os.Root, s selected, target string, agai
 	if s.f.Attr&uc2.AttrReadOnly != 0 {
 		root.Chmod(target, 0o444)
 	}
-	a.say("Decompressing %s OK", "Extract %s", name)
+	a.endBar()
+	a.printf(cOK + "OK")
+	a.outf("\n")
 	return true, nil
 }
 
@@ -291,14 +345,14 @@ func (a *app) confirmOverwrite(c *cmd, name string) (bool, error) {
 	case c.force || a.overwrite == overwriteAll:
 		return true, nil
 	case a.overwrite == overwriteNone:
-		a.printf("Skipping %s (already exists)\n", name)
+		a.printf(cN+"Skipping %s (already exists)\n", name)
 		return false, nil
-	case a.tty:
-		choice, err := a.ask("Overwrite file "+name+" ?", []string{"Yes", "No", "Always overwrite files", "nEver overwrite files"}, "YNAE")
+	case a.canAsk():
+		choice, err := a.ask("Overwrite file "+name+" ?", []option{{"", "Y", "es"}, {"", "N", "o"}, {"", "A", "lways overwrite files"}, {"N", "e", "ver overwrite files"}})
 		if err != nil || choice >= 0 {
 			return a.overwriteChoice(choice, name), err
 		}
-		a.tty = false // end of input, e.g. from NUL, which is a character device
+		a.tty, a.key = false, nil // end of input
 	}
 	a.warnf(sevSkipped, "skipping %s (already exists)", name)
 	return false, nil
@@ -312,37 +366,10 @@ func (a *app) overwriteChoice(choice int, name string) bool {
 		a.overwrite = overwriteNone
 	}
 	if choice == 1 || choice == 3 {
-		a.printf("Skipping %s (already exists)\n", name)
+		a.printf(cN+"Skipping %s (already exists)\n", name)
 		return false
 	}
 	return true
-}
-
-// ask shows a UC2 style menu on stderr and returns the chosen option, or -1
-// at the end of the input.
-func (a *app) ask(question string, options []string, keys string) (int, error) {
-	a.out.Flush()
-	fmt.Fprintf(a.stderr, "\n%s\n", clean(question))
-	for i, o := range options {
-		fmt.Fprintf(a.stderr, "   %d -> %s\n", i+1, o)
-	}
-	for {
-		fmt.Fprint(a.stderr, "CHOICE (+=Abort) ? ")
-		line, err := a.in.ReadString('\n')
-		s := strings.ToUpper(strings.TrimSpace(line))
-		switch {
-		case s == "+":
-			return 0, fatalf(sevAbort, "program aborted by user")
-		case err != nil && s == "":
-			fmt.Fprintln(a.stderr)
-			return -1, nil
-		case len(s) != 1:
-		case strings.IndexByte(keys, s[0]) >= 0:
-			return strings.IndexByte(keys, s[0]), nil
-		case s[0] >= '1' && int(s[0]-'1') < len(options):
-			return int(s[0] - '1'), nil
-		}
-	}
 }
 
 // Windows device names, reserved with any extension.

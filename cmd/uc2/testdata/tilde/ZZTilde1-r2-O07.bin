@@ -1,0 +1,86 @@
+LIST [\]
+   DIR
+      NAME=[ALPHA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[BETA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[EMPTY]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   DIR
+      NAME=[GAMMA]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   FILE
+      NAME=[A.TXT]
+      VERSION=0
+      SIZE=620
+      CHECK=A55A83AD3892
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=05 04 08
+      ATTRIB=A
+   FILE
+      NAME=[RO.TXT]
+      VERSION=0
+      SIZE=25
+      CHECK=8C5DAAAA13E0
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=ARSH
+LIST [\ALPHA\]
+   FILE
+      NAME=[A1.TXT]
+      VERSION=0
+      SIZE=11
+      CHECK=E22AC4DD7D85
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+LIST [\BETA\]
+   DIR
+      NAME=[INNER]
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=
+   FILE
+      NAME=[B1.TXT]
+      VERSION=0
+      SIZE=27
+      CHECK=F071D6866FCE
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=05 04 08
+      ATTRIB=A
+LIST [\BETA\INNER\]
+   FILE
+      NAME=[I1.TXT]
+      VERSION=0
+      SIZE=11
+      CHECK=ED2FCBD87280
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+LIST [\EMPTY\]
+LIST [\GAMMA\]
+   FILE
+      NAME=[G1.TXT]
+      VERSION=0
+      SIZE=11
+      CHECK=EA31CCC6759E
+      DATE(MDY)=01 02 2024
+      TIME(HMS)=04 04 06
+      ATTRIB=A
+END
+SPEC-SECTION
+    DAMPRO = 0
+    VOLLABEL = "TILDELBL   "
+    SERIAL = 0
+    UC2-REVISION = 2
+END

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -14,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,8 +24,7 @@ import (
 )
 
 func newTestApp(stdin string) *app {
-	return &app{in: bufio.NewReader(strings.NewReader(stdin)), rawIn: strings.NewReader(stdin),
-		out: bufio.NewWriter(new(bytes.Buffer)), stderr: new(bytes.Buffer), verbosity: normal}
+	return newApp(strings.NewReader(stdin), new(bytes.Buffer), new(bytes.Buffer))
 }
 
 // uc2Run runs the command line in process, checks the exit code and
@@ -186,8 +185,8 @@ func TestRoundTrip(t *testing.T) {
 		"LONGFI~1 TEX            5  MAY-17-2020  13:30:58  Arch Long file name.text\n",
 		"      2 matching files\n",
 		"\nArchive is NOT damage protected, archive has no volume label\n",
-		"files in archive       = 6        total length all files    = 8,032 bytes\n",
-		"directories in archive = 3        archive length            = ")
+		"files in archive       = 6       total length all files    = 8,032 bytes\n",
+		"directories in archive = 3       archive length            = ")
 
 	uc2Run(t, 0, "ES", "#out", "arch")
 	for name, data := range testTree {
@@ -314,7 +313,7 @@ func TestSmartSkipAndReplace(t *testing.T) {
 	before, _ := os.Stat("arch.UC2")
 	os.Chdir("src")
 	out := uc2Run(t, 0, "as", "../arch")
-	if strings.Contains(out, "Compressing") || !strings.Contains(out, "Smart skipped 6 files (8,032 bytes)") {
+	if strings.Contains(out, "Compressing") || !strings.Contains(out, "Smart skipping 8,032 bytes\n") {
 		t.Errorf("unchanged files were added:\n%s", out)
 	}
 	if after, _ := os.Stat("../arch.UC2"); !after.ModTime().Equal(before.ModTime()) {
@@ -418,7 +417,7 @@ func TestProtectAndRepair(t *testing.T) {
 	uc2Run(t, 0, "a", "arch", "*.*")
 	uc2Run(t, 0, "P", "arch")
 	contains(t, uc2Run(t, 0, "v", "arch"), "Archive is damage protected")
-	contains(t, uc2Run(t, 0, "t", "arch"), "Testing archive sectors OK", "Verifying r1.bin OK")
+	contains(t, uc2Run(t, 0, "t", "arch"), "Testing archive sectors   OK\n", "Testing protection records   OK\n", "Verifying r1.bin OK")
 	uc2Run(t, 0, "U", "arch")
 	contains(t, uc2Run(t, 0, "v", "arch"), "Archive is NOT damage protected")
 	uc2Run(t, 0, "ap", "arch") // nothing to add, but protection changes
@@ -538,10 +537,10 @@ func TestComment(t *testing.T) {
 func TestQuietVerbose(t *testing.T) {
 	setup(t, map[string]string{"a.txt": "a"})
 	out := uc2Run(t, 0, "a", "-q", "arch", "a.txt")
-	if out != "arch.UC2\nAdd a.txt\n" {
+	if out != "arch.UC2\nAdd a.txt \n" {
 		t.Errorf("quiet output %q", out)
 	}
-	contains(t, uc2Run(t, 0, "--verbose", "a", "arch", "a.txt"), "UltraCompressor II Go port", "Smart skipping a.txt")
+	contains(t, uc2Run(t, 0, "--verbose", "a", "arch", "a.txt"), "Scanning .\\ \n", "Smart skipping a.txt")
 }
 
 func TestUnrepairable(t *testing.T) {
@@ -551,7 +550,8 @@ func TestUnrepairable(t *testing.T) {
 	corrupt(t, "arch.UC2", int64(len(b))-30) // central directory
 	contains(t, uc2Run(t, sevDamaged, "t", "arch"), " ERROR 90: archive arch.UC2 cannot be repaired")
 	notExist(t, "FIX_0001.UC2")
-	contains(t, uc2Run(t, sevBroken, "l", "arch"), "FATAL ERROR 200: archive arch.UC2 is damaged")
+	contains(t, uc2Run(t, sevBroken, "l", "arch"), " ERROR 90: archive arch.UC2 is damaged",
+		"FATAL ERROR 200: you should repair this archive with 'uc2 T'")
 }
 
 func TestDeviceNames(t *testing.T) {
@@ -711,6 +711,36 @@ func TestWildcardDirectories(t *testing.T) {
 	checkContents(t, "arch", map[string]string{"other.txt": "o"})
 }
 
+func TestDeleteNames(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeArchive(t, "arch.UC2", "Sub Dir/nested file.txt", "Sub Dir/inner.txt", "f.txt", "f.txt")
+	// As E, UC2 shows the path below the mask directory.
+	contains(t, uc2Run(t, 0, "d", "arch", `sub dir\nested file.txt`), "Deleting nested file.txt\n")
+	contains(t, uc2Run(t, 0, "ds", "arch", "inner.txt"), `Deleting Sub Dir\inner.txt`+"\n")
+	contains(t, uc2Run(t, 0, "d", "arch", "f.txt;1"), "Deleting f.txt;1\n")
+}
+
+func TestExtractOrder(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "testdata", "oracle", "r2_tt.uc2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	os.WriteFile("a.UC2", b, 0o666)
+	var got []string
+	for l := range strings.Lines(uc2Run(t, 0, "efs", "#out", "a")) {
+		if n, ok := strings.CutPrefix(l, `Decompressing out\`); ok {
+			got = append(got, strings.TrimSuffix(n, " OK\n"))
+		}
+	}
+	// r2, 2.3 and 2.37b extract this archive of five masters so.
+	want := []string{"SOURCE.C", "SOUND.WAV", "TEXT.TXT", `SUB\DEEP\DEEPER.TXT`, `SUB\NESTED.TXT`, "HELLO.TXT",
+		"EMPTY.DAT", "ZEROS.BIN", "BINARY.BIN", "RANDOM.BIN", "ALLBYTES.BIN"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
 func TestAddSkipsInternalFiles(t *testing.T) {
 	setup(t, map[string]string{"a.txt": "a", "U$~COMM.TXT": "evil", "u$~12345.tmp": "junk", "sub/U$~X.TMP": "junk", "sub/b.txt": "b"})
 	uc2Run(t, 0, "as", "arch", "*.*")
@@ -740,7 +770,7 @@ func TestIncrementalWriteFailure(t *testing.T) {
 		{disk: "a.txt", root: root, rel: "a.txt", name: "b.txt", info: fi},
 		{disk: "a.txt", root: root, rel: "a.txt", name: "c/../d.txt", info: fi},
 	}}
-	if err := ad.appendTo("arch.UC2"); code(err) != sevWrite {
+	if err := ad.appendTo("arch.UC2", &tally{}, false); code(err) != sevWrite {
 		t.Fatalf("got %v, want write error", err)
 	}
 	if b, _ := os.ReadFile("arch.UC2"); !bytes.Equal(b, orig) {
@@ -902,7 +932,7 @@ func TestExtractLinks(t *testing.T) {
 	if links == 0 {
 		t.Skip("cannot create links")
 	}
-	uc2Run(t, sevWrite, "efs", "#out", "links")
+	uc2Run(t, sevMkdir, "efs", "#out", "links")
 	if es, _ := os.ReadDir("outside"); len(es) != 0 {
 		t.Errorf("files created outside the destination: %v", es)
 	}

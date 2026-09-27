@@ -17,6 +17,16 @@ jobs:
           go-version-file: go.mod
       - name: gofmt
         run: test -z "$(gofmt -l . | tee /dev/stderr)"
+      - name: go fix
+        run: |
+          for os in linux windows darwin; do
+            out=$(GOOS=$os go fix -diff ./... 2>&1) || true
+            if [ -n "$out" ]; then
+              echo "$out"
+              echo "::error::go fix has changes for GOOS=$os; run: GOOS=$os go fix ./..."
+              exit 1
+            fi
+          done
       - name: go vet
         run: go vet ./...
       - name: staticcheck

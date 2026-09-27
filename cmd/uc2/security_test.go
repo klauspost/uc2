@@ -14,6 +14,42 @@ import (
 	"github.com/klauspost/uc2"
 )
 
+func TestTildeDScriptNames(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeArchive(t, "evil.UC2", "readme.txt", "&", "L", "VICTIM.UC2", "@X", "!E", "#D/f.txt")
+	writeArchive(t, "victim.UC2", "keep.txt")
+	out, _ := tildeRun(t, 0, "~D", "evil")
+	// Total Commander extracts the files it shows by writing their names,
+	// unquoted, into a script.
+	var names []string
+	dir := ""
+	lines := strings.Split(out, "\r\n")
+	for i, l := range lines {
+		if d, ok := strings.CutPrefix(l, `LIST [\`); ok {
+			dir = strings.TrimSuffix(d, "]")
+		}
+		if n, ok := strings.CutPrefix(l, "      NAME=["); ok {
+			n = strings.TrimSuffix(n, "]")
+			if strings.ContainsAny(n[:1], "&@#!") || strings.ContainsAny(dir[:min(1, len(dir))], "&@#!") {
+				t.Errorf("~D shows %q in %q", n, dir)
+			}
+			// Masks take no wildcards in directories, so ?D\F.TXT cannot select
+			// the file in #D: safe, and too rare to matter.
+			if lines[i-1] == "   FILE" && dir == "" {
+				names = append(names, n)
+			}
+		}
+	}
+	os.WriteFile("tc.tmp", []byte("EF evil.UC2 #out\r\n   "+strings.Join(names, "\r\n   ")+"\r\n"), 0o666)
+	if o := uc2Run(t, 0, "@tc.tmp"); strings.Contains(o, "Listing files from") {
+		t.Errorf("script ran another command:\n%s", o)
+	}
+	checkContents(t, "victim", map[string]string{"keep.txt": "archived 0"})
+	checkFile(t, "out/&", "archived 1")
+	checkFile(t, "out/@X", "archived 4")
+	checkFile(t, "out/!E", "archived 5")
+}
+
 func TestExtractDotGit(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeArchive(t, "repo.UC2", ".git/hooks/pre-commit", ".git/config", "a.txt")
@@ -64,6 +100,42 @@ func TestShellGlobNames(t *testing.T) {
 	contains(t, uc2Run(t, 0, "@s"), "Listing files from victim.UC2", "Listing files from arch.UC2")
 }
 
+func TestScriptLineNames(t *testing.T) {
+	// Names that would be flags, a script, a separator, a destination or an exclusion.
+	names := []string{"My File.txt", "b.txt", "-x y", "#1 draft.txt", "!old notes.txt",
+		"-f", "-r", "-h", "--move", "@x", "&", "#out", "!b.txt"}
+	files := map[string]string{}
+	for _, n := range names {
+		files[n] = "file " + n
+	}
+	setup(t, files)
+	writeFiles(t, map[string]string{"x": "& d victim *.*", "sub/other.txt": "unlisted"}, stamp)
+	writeArchive(t, "victim.UC2", "keep.txt")
+	// Total Commander's list files: one name per line, unquoted.
+	os.WriteFile("list.tmp", []byte(strings.Join(names, "\r\n")+"\r\n"), 0o666)
+	uc2Run(t, 0, "a", "arch", "@list.tmp")
+	checkContents(t, "arch", files)
+	checkFile(t, "b.txt", "file b.txt")
+	checkContents(t, "victim", map[string]string{"keep.txt": "archived 0"})
+	// Lines that are no file keep splitting into words.
+	os.WriteFile("s.USC", []byte("l arch\r\n"), 0o666)
+	contains(t, uc2Run(t, 0, "@s"), "Listing files from arch.UC2")
+
+	// Names from an archive need not exist on disk; they are masks, as in UC2.
+	writeArchive(t, "names.UC2", "-f", "-h", "--x.txt", "other.txt")
+	os.Mkdir("tc", 0o777)
+	t.Chdir("tc")
+	os.WriteFile("e.tmp", []byte("EF ../names #out\r\n   -F\r\n   --X.TXT\r\n"), 0o666)
+	uc2Run(t, 0, "@e.tmp")
+	checkFile(t, "out/-f", "archived 0")
+	checkFile(t, "out/--x.txt", "archived 2")
+	notExist(t, "out/-h")
+	notExist(t, "out/other.txt")
+	os.WriteFile("d.tmp", []byte("ds ../names\r\n-H\r\n"), 0o666)
+	uc2Run(t, 0, "@d.tmp")
+	checkContents(t, "../names", map[string]string{"-f": "archived 0", "--x.txt": "archived 2", "other.txt": "archived 3"})
+}
+
 func TestRewriteRefusesDamage(t *testing.T) {
 	setup(t, map[string]string{"a.bin": randomData(20000, 4), "b.txt": "b", "c.txt": "c"})
 	uc2Run(t, 0, "ap", "arch", "a.bin", "b.txt")
@@ -74,7 +146,7 @@ func TestRewriteRefusesDamage(t *testing.T) {
 		{"d", "arch", "b.txt"}, {"a", "arch", "c.txt"}, {"m", "arch", "c.txt"}, {"em", "#x", "arch", "b.txt"},
 		{"r", "arch", "--comment-file", "c.txt"}, {"o", "arch"},
 	} {
-		contains(t, uc2Run(t, sevBroken, args...), "FATAL ERROR 200: archive arch.UC2 is damaged", "repair it with 'uc2 T'")
+		contains(t, uc2Run(t, sevBroken, args...), " ERROR 90: archive arch.UC2 is damaged", "FATAL ERROR 200: you should repair this archive with 'uc2 T'")
 		if b, _ := os.ReadFile("arch.UC2"); !bytes.Equal(b, bad) {
 			t.Fatalf("%q modified the damaged archive", args)
 		}
@@ -147,7 +219,7 @@ func TestAddReplacedFile(t *testing.T) {
 	}
 	a := newTestApp("")
 	ad := &adder{a: a, c: &cmd{op: 'A'}, items: []*item{{disk: "a.txt", root: root, rel: "a.txt", name: "a.txt", info: fi}}}
-	if err := a.rewrite("arch.UC2", nil, nil, func(w *uc2.Writer) error { return ad.write(w, false) }, nil); err != nil {
+	if err := a.rewrite("arch.UC2", nil, nil, func(w *uc2.Writer, t *tally) error { return ad.write(w, false, t) }, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	contains(t, a.stderr.(*bytes.Buffer).String(), " WARNING 30: skipped file a.txt (file was replaced)")
@@ -172,7 +244,7 @@ func TestMoveExtractSmartSkipContent(t *testing.T) {
 	writeArchive(t, "arch.UC2", "doc.txt", "same.txt")
 	// Both have the size and time of the archived revisions; doc.txt has other data.
 	writeFiles(t, map[string]string{"out/doc.txt": "my edit 0!", "out/same.txt": "archived 1"}, stamp)
-	contains(t, uc2Run(t, sevSkipped, "em", "#out", "arch"), "Smart skipping same.txt", " WARNING 30: skipping doc.txt (already exists)")
+	contains(t, uc2Run(t, sevSkipped, "em", "#out", "arch"), "Smart skipping out\\same.txt OK", " WARNING 30: skipping out\\doc.txt (already exists)")
 	checkFile(t, "out/doc.txt", "my edit 0!")
 	checkContents(t, "arch", map[string]string{"doc.txt": "archived 0"})
 }
@@ -200,11 +272,11 @@ func TestConcurrentUpdate(t *testing.T) {
 			}
 		}
 		before, _ := os.ReadFile("arch.UC2")
-		err := newTestApp("").rewrite("arch.UC2", r, nil, func(w *uc2.Writer) error {
+		err := newTestApp("").rewrite("arch.UC2", r, nil, func(w *uc2.Writer, _ *tally) error {
 			change()
 			before, _ = os.ReadFile("arch.UC2")
 			return nil
-		}, nil)
+		}, nil, false)
 		if code(err) != sevWrite || !strings.Contains(err.Error(), "by another process") {
 			t.Errorf("%s: got %v", name, err)
 		}
@@ -260,7 +332,7 @@ func TestInterruptRemovesTemps(t *testing.T) {
 	defer r.Close()
 	sig, exited := make(chan os.Signal, 1), make(chan int, 1)
 	go onSignal(sig, io.Discard, func(code int) { exited <- code })
-	err = a.rewrite("arch.UC2", r, nil, func(w *uc2.Writer) error {
+	err = a.rewrite("arch.UC2", r, nil, func(w *uc2.Writer, _ *tally) error {
 		if m, _ := filepath.Glob("U$~*.TMP"); len(m) != 1 {
 			t.Errorf("temporary files %q", m)
 		}
@@ -272,7 +344,7 @@ func TestInterruptRemovesTemps(t *testing.T) {
 			t.Errorf("temporary files %q left after the signal", m)
 		}
 		return errors.New("interrupted")
-	}, nil)
+	}, nil, false)
 	if err == nil {
 		t.Error("rewrite succeeded")
 	}

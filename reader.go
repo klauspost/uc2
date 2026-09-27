@@ -23,6 +23,11 @@ import (
 
 const maxReadCDIR = 256 << 20
 
+// cdirLimit is the largest central directory read from compLen compressed
+// bytes. It bounds the expansion of hostile input; real central
+// directories expand less than 40-fold.
+func cdirLimit(compLen int64) int64 { return min(maxReadCDIR, 1<<20+compLen*128) }
+
 var (
 	zero512   = make([]byte, 512)
 	readerIDs atomic.Uint64
@@ -160,8 +165,7 @@ func (r *Reader) init(ra io.ReaderAt, size int64, opts []Option) error {
 	if comp.CompLen != 0 && int64(comp.CompLen) <= inLen {
 		inLen = int64(comp.CompLen)
 	}
-	// Bound the expansion of hostile input; real central directories expand less than 40-fold.
-	limit := min(maxReadCDIR, 1<<20+inLen*128)
+	limit := cdirLimit(inLen)
 	dec := ultra.NewReader(io.NewSectionReader(ra, start, inLen), zero512, ultra.Unlimited)
 	raw, err := io.ReadAll(io.LimitReader(dec, limit+1))
 	if err != nil {

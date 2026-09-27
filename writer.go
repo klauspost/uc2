@@ -762,6 +762,10 @@ func (w *Writer) finish() error {
 	}
 	cdirOff := w.off
 	stream := ultra.Compress(raw, zeroDict(), int(min(w.cfg.level, Tight)))
+	if limit := cdirLimit(int64(len(stream))); int64(len(raw)) > limit {
+		// Such as many large, repetitive tags: the reader would refuse it.
+		return w.fail(fmt.Errorf("uc2: central directory too large (%d bytes, max %d)", len(raw), limit))
+	}
 	w.write(format.Compress{CompLen: uint32(len(stream)), Method: uint16(min(w.cfg.level, Tight)), Prefix: format.NoMaster}.Append(nil))
 	w.write(stream)
 	compEnd := w.off

@@ -45,3 +45,26 @@ func replaceFile(tmp, dst string) error {
 	}
 	return &os.LinkError{Op: "replace", Old: tmp, New: dst, Err: err}
 }
+
+var procSetConsoleMode = syscall.NewLazyDLL("kernel32.dll").NewProc("SetConsoleMode")
+
+// enableVT turns on ANSI sequences for the console f and returns a function
+// that restores the previous mode.
+func enableVT(f *os.File) (restore func(), ok bool) {
+	h := syscall.Handle(f.Fd())
+	var mode uint32
+	if syscall.GetConsoleMode(h, &mode) != nil {
+		return nil, false
+	}
+	const vt = 0x0004 // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+	if mode&vt != 0 {
+		return func() {}, true
+	}
+	if r, _, _ := procSetConsoleMode.Call(uintptr(h), uintptr(mode|vt)); r == 0 {
+		return nil, false // a console without VT support, before Windows 10
+	}
+	return func() { procSetConsoleMode.Call(uintptr(h), uintptr(mode)) }, true
+}
+
+// openConsole opens the console for reading key presses.
+func openConsole() (*os.File, error) { return os.OpenFile("CONIN$", os.O_RDWR, 0) }

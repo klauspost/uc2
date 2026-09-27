@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"unicode"
 
 	"github.com/klauspost/uc2"
+	"github.com/klauspost/uc2/cmd/uc2/internal/term"
 )
 
 // Exit codes (severity levels) of the original UC2.
@@ -26,7 +28,9 @@ const (
 	sevNoMatch    = 20
 	sevSkipped    = 30
 	sevDelete     = 55
+	sevRmdir      = 60
 	sevWrite      = 80
+	sevMkdir      = 85
 	sevDamaged    = 90
 	sevAbort      = 100
 	sevEditor     = 115
@@ -35,6 +39,7 @@ const (
 	sevNoArchive  = 130
 	sevVersion    = 145
 	sevFix        = 150
+	sevChdir      = 185
 	sevBroken     = 200
 	sevInternal   = 255
 )
@@ -46,26 +51,42 @@ const (
 )
 
 type fatalError struct {
-	code int
-	msg  string
+	code  int
+	msg   string
+	cause string // reported as ERROR 90 before the fatal error, if set
 }
 
 func (e *fatalError) Error() string { return e.msg }
 
 func fatalf(code int, format string, args ...any) error {
-	return &fatalError{code, fmt.Sprintf(format, args...)}
+	return &fatalError{code: code, msg: fmt.Sprintf(format, args...)}
 }
 
 type app struct {
-	in        *bufio.Reader
-	rawIn     io.Reader
-	out       *bufio.Writer
-	stderr    io.Writer
-	tty       bool // prompts are possible: stdin and stderr are terminals
-	inTTY     bool
-	verbosity int
+	in          *bufio.Reader
+	rawIn       io.Reader
+	out, errOut *painter  // stdout and stderr
+	stdout      io.Writer // the raw streams
+	stderr      io.Writer
+	tty         bool // line prompts are possible: stdin and stderr are terminals
+	inTTY       bool
+	console     bool // stderr is a terminal: the console may be opened for key prompts
+	termOut     bool // stdout is a terminal: progress bars are drawn
+	vtOut       bool // stdout takes VT sequences, known after initConsole
+	noHigh      bool // UC2_NO_HIGH_ASCII
+	verbosity   int
+
+	key     func() ([]byte, error) // reads a key press, nil for line input
+	keys    *term.Keys             // reads stdin from the first full-screen session on
+	openTUI func() (*tui, error)   // opens the terminal for the full-screen help
+	unraw   func()                 // ends raw mode while a key is read; guarded by tempMu
+	bar     *bar
+	restore []func() // restores the console at exit
+	now     func() time.Time
+	sleep   func(time.Duration)
 
 	severity, errors, warnings int
+	dump                       bool // a ~ command ran: U$~RESLT.OK ends the run
 	headers                    int
 	overwrite                  int
 	mapped                     map[string]bool // Windows name mappings reported
@@ -85,6 +106,14 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
+func newApp(stdin io.Reader, stdout, stderr io.Writer) *app {
+	a := &app{rawIn: stdin, out: &painter{w: bufio.NewWriter(stdout)}, errOut: &painter{w: stderr},
+		stdout: stdout, stderr: stderr, verbosity: normal, now: time.Now, sleep: time.Sleep}
+	a.in = bufio.NewReader(stdinReader{a})
+	a.openTUI = a.openTTY
+	return a
+}
+
 // temp is a temporary file to remove when the program is interrupted.
 type temp struct {
 	f      *os.File
@@ -92,8 +121,9 @@ type temp struct {
 }
 
 var (
-	tempMu sync.Mutex
-	temps  = map[*temp]bool{}
+	tempMu  sync.Mutex
+	temps   = map[*temp]bool{}
+	aborter func() // reports an interrupt through the running app
 )
 
 // track registers an open temporary file; the returned function
@@ -120,34 +150,56 @@ func onSignal(sig <-chan os.Signal, stderr io.Writer, exit func(int)) {
 	for t := range temps {
 		t.f.Close() // Windows cannot remove open files
 		// A write in progress can keep the file open a little longer.
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			if err := t.remove(); err == nil || errors.Is(err, fs.ErrNotExist) {
 				break
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
 	}
-	fmt.Fprintf(stderr, "\nFATAL ERROR %d: program aborted by user\n", sevAbort)
+	if aborter != nil {
+		aborter()
+	} else {
+		fmt.Fprintf(stderr, "\nFATAL ERROR %d: program aborted by user\n", sevAbort)
+	}
 	exit(sevAbort)
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	a := &app{in: bufio.NewReader(stdin), rawIn: stdin, out: bufio.NewWriter(stdout), stderr: stderr, verbosity: normal}
+	a := newApp(stdin, stdout, stderr)
 	a.inTTY = isTerminal(stdin)
-	a.tty = a.inTTY && isTerminal(stderr)
+	a.console = isTerminal(stderr)
+	a.tty = a.inTTY && a.console
+	a.termOut = isTerminal(stdout)
+	tempMu.Lock()
+	aborter = a.abort
+	tempMu.Unlock()
+	defer func() {
+		tempMu.Lock()
+		aborter = nil
+		tempMu.Unlock()
+	}()
 	return a.run(args)
 }
 
-func isTerminal(x any) bool {
-	f, ok := x.(*os.File)
-	if !ok {
-		return false
+// abort reports an interrupt. It runs on the signal goroutine while the
+// program may still be working; the process exits right after.
+func (a *app) abort() {
+	if a.unraw != nil {
+		a.unraw()
 	}
-	fi, err := f.Stat()
-	return err == nil && fi.Mode()&fs.ModeCharDevice != 0
+	a.errors++
+	fmt.Fprintf(a.errOut, "\n"+cErr+"FATAL ERROR %d: program aborted by user\n", sevAbort)
+	if a.dump {
+		dumpResult(false)
+	} else {
+		a.summary()
+	}
+	a.restoreConsole()
 }
 
 func (a *app) run(args []string) (code int) {
+	defer a.restoreConsole()
 	defer a.out.Flush()
 	defer func() {
 		if p := recover(); p != nil {
@@ -156,13 +208,24 @@ func (a *app) run(args []string) (code int) {
 		}
 	}()
 	if len(args) == 0 || isHelpWord(args[0]) {
-		a.help()
-		return 0
+		return a.helpCmd(args)
 	}
 	cmds, g, err := parseArgs(args)
 	a.verbosity = g.verbosity
+	if g.help || g.version {
+		a.initConsole("never")
+	} else {
+		a.initConsole(g.color)
+	}
+	// UC2 shows no logo when the first word is a ~ command.
+	word := commandWord(args)
+	tilde := err == nil && len(cmds) > 0 && cmds[0].op == '~' || err != nil && strings.HasPrefix(word, "~")
 	switch {
 	case err != nil:
+		if !tilde {
+			a.logo()
+		}
+		a.dump = tilde && isDumpCommand(word)
 		a.fatal(err)
 		return a.finish()
 	case g.help || len(cmds) == 0 && !g.version:
@@ -172,7 +235,9 @@ func (a *app) run(args []string) (code int) {
 		fmt.Fprintf(a.out, "uc2 %s (UltraCompressor II revision 2 compatible)\n", version())
 		return 0
 	}
-	a.verbosef("UltraCompressor II Go port %s\n", version())
+	if !tilde {
+		a.logo()
+	}
 	for _, c := range cmds {
 		if err := a.exec(c); err != nil {
 			a.fatal(err)
@@ -182,7 +247,13 @@ func (a *app) run(args []string) (code int) {
 	return a.finish()
 }
 
+// buildVersion is set by release builds (-X main.buildVersion=...).
+var buildVersion string
+
 func version() string {
+	if buildVersion != "" {
+		return "v" + strings.TrimPrefix(buildVersion, "v")
+	}
 	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
 		return bi.Main.Version
 	}
@@ -190,10 +261,21 @@ func version() string {
 }
 
 func (a *app) finish() int {
-	if a.errors+a.warnings == 0 {
-		a.printf("\nEverything went OK\n")
-		return a.severity
+	switch {
+	case a.dump:
+		a.breakLine()
+		dumpResult(a.errors+a.warnings == 0)
+	case a.errors+a.warnings == 0:
+		a.printf("\n" + cOK + "Everything went OK\n")
+	default:
+		a.breakLine()
+		a.summary()
 	}
+	return a.severity
+}
+
+// summary reports the number of errors and warnings on stderr.
+func (a *app) summary() {
 	noun := func(n int, what string) string {
 		if n == 1 {
 			return "1 " + what
@@ -215,13 +297,14 @@ func (a *app) finish() int {
 	default:
 		s = noun(a.warnings, "warning") + have(a.warnings)
 	}
-	a.out.Flush()
-	fmt.Fprintf(a.stderr, "\n%s been reported\n", s)
-	return a.severity
+	fmt.Fprintf(a.errOut, cErr+"\n%s been reported \n", s)
 }
 
 func (a *app) exec(c *cmd) error {
 	a.overwrite, a.mapped = overwriteAsk, map[string]bool{}
+	if c.op == '~' {
+		return a.tilde(c)
+	}
 	for _, arch := range a.archives(c) {
 		var err error
 		switch c.op {
@@ -274,76 +357,72 @@ func cleanArgs(args []any) []any {
 	return args
 }
 
-func (a *app) printf(format string, args ...any) {
-	if a.verbosity >= normal {
-		fmt.Fprintf(a.out, format, cleanArgs(args)...)
-	}
-}
+// printf prints at normal and verbose level (UC2 level 3).
+func (a *app) printf(format string, args ...any) { a.outl(lvStd, format, args...) }
 
-func (a *app) quietf(format string, args ...any) {
-	if a.verbosity == quiet {
-		fmt.Fprintf(a.out, format, cleanArgs(args)...)
-	}
-}
+// normalf prints at normal level only (UC2 level 2).
+func (a *app) normalf(format string, args ...any) { a.outl(lvNormal, format, args...) }
 
-func (a *app) verbosef(format string, args ...any) {
-	if a.verbosity >= verbose {
-		fmt.Fprintf(a.out, format, cleanArgs(args)...)
-	}
-}
+func (a *app) quietf(format string, args ...any) { a.outl(lvQuiet, format, args...) }
+
+func (a *app) verbosef(format string, args ...any) { a.outl(lvVerbose, format, args...) }
 
 // outf prints requested output (listings), regardless of the verbosity.
-func (a *app) outf(format string, args ...any) { fmt.Fprintf(a.out, format, cleanArgs(args)...) }
+func (a *app) outf(format string, args ...any) { a.outl(lvAll, format, args...) }
 
-// say prints a per-file progress line: long at normal verbosity, short when quiet.
-func (a *app) say(long, short, name string) {
-	a.printf(long+"\n", name)
-	if short != "" {
-		a.quietf(short+"\n", name)
-	}
-}
-
-func (a *app) report(kind string, code int, msg string) {
-	a.out.Flush()
-	fmt.Fprintf(a.stderr, "%s %d: %s\n", kind, code, clean(msg))
+func (a *app) report(format string, code int, msg string) {
+	a.breakLine()
+	fmt.Fprintf(a.errOut, format, code, clean(msg))
 	a.severity = max(a.severity, code)
 }
 
 func (a *app) warnf(code int, format string, args ...any) {
 	a.warnings++
-	a.report(" WARNING", code, fmt.Sprintf(format, args...))
+	a.report(cErr+" WARNING %d: %s\n", code, fmt.Sprintf(format, args...))
 }
 
 func (a *app) errorf(code int, format string, args ...any) {
 	a.errors++
-	a.report(" ERROR", code, fmt.Sprintf(format, args...))
+	a.report(cErr+" ERROR %d: %s\n", code, fmt.Sprintf(format, args...))
 }
 
 func (a *app) fatal(err error) {
 	var fe *fatalError
 	if !errors.As(err, &fe) {
-		fe = &fatalError{sevInternal, err.Error()}
+		fe = &fatalError{code: sevInternal, msg: err.Error()}
+	}
+	if fe.cause != "" {
+		a.errorf(sevDamaged, "%s", fe.cause)
 	}
 	a.errors++
-	a.report("FATAL ERROR", fe.code, fe.msg)
+	a.report("\n"+cErr+"FATAL ERROR %d: %s\n", fe.code, fe.msg)
 }
 
 // header announces the archive being processed, like UC2's Arch().
 func (a *app) header(verb string, c *cmd, arch string) {
 	if a.headers++; a.headers > 1 {
-		a.printf("\n")
+		a.outf("\n")
 	}
 	switch {
 	case c.destSrc && c.dest != "":
-		a.printf("%s %s (destination path %s+<sourcepath>)\n", verb, arch, c.dest)
+		a.printf(cOK+"%s %s (destination path %s+<sourcepath>)\n", verb, arch, dispDir(c.dest))
 	case c.destSrc:
-		a.printf("%s %s (destination path <sourcepath>)\n", verb, arch)
+		a.printf(cOK+"%s %s (destination path <sourcepath>)\n", verb, arch)
 	case c.dest != "":
-		a.printf("%s %s (destination path %s)\n", verb, arch, c.dest)
+		a.printf(cOK+"%s %s (destination path %s)\n", verb, arch, dispDir(c.dest))
 	default:
-		a.printf("%s %s\n", verb, arch)
+		a.printf(cOK+"%s %s\n", verb, arch)
 	}
-	a.quietf("%s\n", arch)
+	a.quietf(cOK+"%s\n", arch)
+}
+
+// dispDir formats a directory path DOS style, with a trailing backslash.
+func dispDir(d string) string {
+	d = strings.ReplaceAll(filepath.ToSlash(d), "/", `\`)
+	if !strings.HasSuffix(d, `\`) {
+		d += `\`
+	}
+	return d
 }
 
 // damaged reports whether err indicates a corrupt archive.
@@ -365,7 +444,8 @@ func archiveErr(arch string, err error) error {
 	case errors.Is(err, errors.ErrUnsupported):
 		return fatalf(sevVersion, "%s: %v", arch, err)
 	case damaged(err):
-		return fatalf(sevBroken, "archive %s is damaged (%v), repair it with 'uc2 T'", arch, err)
+		return &fatalError{code: sevBroken, msg: "you should repair this archive with 'uc2 T'",
+			cause: fmt.Sprintf("archive %s is damaged (%v)", arch, err)}
 	case errors.As(err, new(*fs.PathError)):
 		return fatalf(sevNoArchive, "failed to access archive %s (%v)", arch, err)
 	}

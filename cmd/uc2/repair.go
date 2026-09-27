@@ -44,15 +44,28 @@ func (a *app) test(c *cmd, arch string) error {
 }
 
 func (a *app) check(r *uc2.Reader, arch string) bool {
-	err := r.Check()
-	switch {
-	case err != nil:
+	var err error
+	if r.Protected {
+		// Check verifies the sectors and the protection records together.
+		a.printf(cN + "Testing archive sectors ")
+		a.startBar(lvStd, -1)
+		a.animate()
+		err = r.Check()
+		a.endBar()
+		if err == nil {
+			a.printf("  " + cOK + "OK\n" + cN + "Testing protection records ")
+			a.startBar(lvStd, -1)
+			a.endBar()
+			a.printf("  " + cOK + "OK\n")
+		}
+	} else {
+		err = r.Check()
+	}
+	if err != nil {
 		a.errorf(sevDamaged, "archive %s is damaged (%v)", arch, err)
-	case r.Protected:
-		a.printf("Testing archive sectors OK\nTesting protection records OK\n")
 	}
 	if !r.Protected {
-		a.printf("Archive is not damage protected\n")
+		a.printf(cN + "Archive is not damage protected\n")
 	}
 	return err == nil
 }
@@ -87,17 +100,23 @@ func (a *app) verify(c *cmd, r *uc2.Reader) (map[*uc2.File]bool, error) {
 			}()
 		}
 	}()
+	a.phase(lvNormal, "Analyzing", nil)
 	bad := map[*uc2.File]bool{}
 	for i, f := range files {
 		<-done[i]
-		switch err := errs[i]; {
-		case errors.Is(err, errors.ErrUnsupported):
+		err := errs[i]
+		if errors.Is(err, errors.ErrUnsupported) {
 			return nil, fatalf(sevVersion, "%s: %v", dispFile(f), err)
-		case err != nil:
+		}
+		// The files are verified in parallel; the bar shows the result only.
+		a.printf(cN+"Verifying %s ", dispFile(f))
+		a.startBar(lvStd, -1)
+		a.endBar()
+		if err != nil {
 			bad[f] = true
 			a.errorf(sevDamaged, "file %s is damaged", dispFile(f))
-		default:
-			a.printf("Verifying %s OK\n", dispFile(f))
+		} else {
+			a.printf(cOK + "OK\n")
 		}
 	}
 	return bad, nil
@@ -128,7 +147,8 @@ func (a *app) repair(c *cmd, arch string, r *uc2.Reader, bad map[*uc2.File]bool)
 	src, srcBad := r, bad
 	var fr *uc2.ReadCloser
 	if fix != "" {
-		a.printf("\nTesting/repairing %s\n", fix)
+		a.printf("\n"+cN+"Testing/repairing %s\n", fix)
+		a.endLine(lvQuiet) // after "Archive has been repaired", which has no line end
 		if fr, err = uc2.OpenReader(fix, c.opts(nil)...); err != nil {
 			a.errorf(sevDamaged, "archive %s is damaged (%v)", fix, err)
 		} else {
@@ -139,7 +159,7 @@ func (a *app) repair(c *cmd, arch string, r *uc2.Reader, bad map[*uc2.File]bool)
 				return err
 			}
 			if checked && len(fb) == 0 {
-				a.printf(" MESSAGE: all files have been restored 100%%\n")
+				a.outf(cOK + " MESSAGE: all files have been restored 100%%\n")
 				a.untouched(fix, arch)
 				return nil
 			}
@@ -159,7 +179,7 @@ func (a *app) repair(c *cmd, arch string, r *uc2.Reader, bad map[*uc2.File]bool)
 	if err != nil {
 		return err
 	}
-	msg := "some files might be damaged"
+	msg := cErr + " MESSAGE: some files might be damaged\n"
 	if fix != "" {
 		// Replace the sector repaired copy, which is still damaged.
 		if fr != nil {
@@ -168,19 +188,19 @@ func (a *app) repair(c *cmd, arch string, r *uc2.Reader, bad map[*uc2.File]bool)
 		if os.Remove(fix) == nil && os.Rename(name, fix) == nil {
 			name = fix
 		}
-		msg = "some files might still be damaged"
+		msg = cErr + " MESSAGE: some files might still be damaged\n"
 	}
 	if len(srcBad) == 0 {
-		msg = "all files have been restored 100%"
+		msg = cOK + " MESSAGE: all files have been restored 100%%\n"
 	}
-	a.printf(" MESSAGE: %s\n", msg)
+	a.outf(msg)
 	a.untouched(name, arch)
 	return nil
 }
 
 func (a *app) untouched(fix, arch string) {
-	a.printf(" MESSAGE: original archive is not touched (beware of bad sectors!)\n")
-	a.printf("          (%s contains a repaired 'copy' of %s)\n", fix, arch)
+	a.outf(cErr + " MESSAGE: original archive is not touched (beware of bad sectors!)\n")
+	a.outf(cErr+"          (%s contains a repaired 'copy' of %s)\n", fix, arch)
 }
 
 // claimFix creates the first free FIX_nnnn.UC2 in the current directory.
@@ -240,13 +260,22 @@ func (a *app) repairSectors(arch string, perm fs.FileMode) (string, error) {
 		return "", err
 	}
 	name := out.Name()
-	a.printf("Creating archive %s\n", name)
+	a.outf(cN+"Creating archive %s\n", name)
 	_, err = io.Copy(out, io.NewSectionReader(f, 0, size))
+	// The lines follow UC2, which copies sector by sector (DAMPRO.CPP).
+	next := int64(0)
 	for _, s := range slices.Sorted(maps.Keys(fixed)) {
 		if err == nil {
 			_, err = out.WriteAt(fixed[s], s*sectorSize)
 		}
-		a.printf("Reconstructing sector %d OK\n", s+1)
+		if s > next {
+			a.printf(cN + "Copying archive sectors ")
+		}
+		a.outf("\n"+cN+"Reconstructing sector %d "+cOK+" OK\n", s+1)
+		next = s + 1
+	}
+	if next*sectorSize < l {
+		a.printf(cN + "Copying archive sectors \n")
 	}
 	if err == nil {
 		// The spare header after the protection area is not covered by it.
@@ -264,7 +293,7 @@ func (a *app) repairSectors(arch string, perm fs.FileMode) (string, error) {
 		os.Remove(name)
 		return "", fatalf(sevFix, "cannot write %s (%v)", name, err)
 	}
-	a.printf("Archive has been repaired (using damage protection)\n")
+	a.outf(cOK + "Archive has been repaired (using damage protection)")
 	return name, nil
 }
 
@@ -287,19 +316,21 @@ func (a *app) salvage(c *cmd, src *uc2.Reader, bad map[*uc2.File]bool, perm fs.F
 		return "", err
 	}
 	name := out.Name()
-	a.printf("Creating archive %s\n", name)
+	a.outf(cN+"Creating archive %s\n", name)
 	protected := src.Protected
 	w := uc2.NewWriter(out, c.opts(&protected)...)
 	if src.Label != "" {
 		err = w.SetLabel(src.Label)
 	}
+	t := &tally{}
 	for _, f := range src.File {
 		if err == nil && !bad[f] {
 			err = w.Copy(f)
+			t.add(f)
 		}
 	}
 	if err == nil {
-		err = w.Close()
+		err = a.closeArchive(w, t, protected)
 	}
 	if err == nil {
 		err = out.Sync()

@@ -1,0 +1,76 @@
+LIST [\]
+   DIR
+      NAME=[STRA·E]
+      LONGNAME=[Stra·e]
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[GRö·E.TXT]
+      LONGNAME=[GrÅ·e.txt]
+      VERSION=0
+      SIZE=24
+      CHECK=BE0398F421BF
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[PLAIN.TXT]
+      LONGNAME=[plain.txt]
+      VERSION=0
+      SIZE=22
+      CHECK=E357C5A07CE5
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[__~1.TXT]
+      LONGNAME=[__.txt]
+      VERSION=0
+      SIZE=23
+      CHECK=12DE34298D6D
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+      TAG=[Win95 LongN]
+   FILE
+      NAME=[UPPER.TXT]
+      VERSION=0
+      SIZE=22
+      CHECK=CB67ED9054D5
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+   FILE
+      NAME=[U$~COMM.TXT]
+      VERSION=0
+      SIZE=17
+      CHECK=8841AEB617F4
+      DATE(MDY)=09 27 2026
+      TIME(HMS)=14 29 28
+      ATTRIB=A
+LIST [\STRA·E\]
+   FILE
+      NAME=[éRGER.TXT]
+      LONGNAME=[érger.txt]
+      VERSION=0
+      SIZE=31
+      CHECK=9E37B8C0018C
+      DATE(MDY)=05 06 2024
+      TIME(HMS)=07 08 10
+      ATTRIB=A
+      TAG=[UC2X:UTF8Name]
+      TAG=[Win95 LongN]
+END
+SPEC-SECTION
+    DAMPRO = 0
+    VOLLABEL = "GOLABEL    "
+    SERIAL = 0
+    UC2-REVISION = 2
+END
