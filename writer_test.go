@@ -213,6 +213,10 @@ func TestWriterProtected(t *testing.T) {
 }
 
 func TestWriterDeterministic(t *testing.T) {
+	// The comment is stamped with the current time, which may tick between the two archives.
+	t0 := time.Now()
+	defer func(f func() time.Time) { now = f }(now)
+	now = func() time.Time { return t0 }
 	files := corpus(2)
 	a := writeArchive(t, files, WithConcurrency(1), WithLevel(Tight))
 	b := writeArchive(t, files, WithConcurrency(8), WithLevel(Tight))
